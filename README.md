@@ -329,6 +329,49 @@ supabase/migrations/20260906000000_reconciliation_feedback.sql
 
 ---
 
+## ☁️ Production Deployment Guide
+
+LedgerForge is architected for modern decoupled cloud deployment: **React Frontend on Vercel** and the **FastAPI Backend on Render, Railway, or Fly.io** (with Supabase PostgreSQL).
+
+### 1. Deploy Frontend to Vercel
+
+1. **Import the repository** into [Vercel](https://vercel.com/new).
+2. **Configure Project Settings**:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: `frontend` *(or leave root; root `vercel.json` is also provided)*
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+3. **Add Environment Variables** in Vercel:
+   | Variable | Value | Description |
+   |---|---|---|
+   | `VITE_API_URL` | `https://your-backend.onrender.com` | URL of your deployed FastAPI backend (omit trailing slash) |
+   | `VITE_SUPABASE_URL` | `https://your-project.supabase.co` | Supabase project URL |
+   | `VITE_SUPABASE_ANON_KEY` | `your-anon-key` | Supabase anonymous public key |
+4. **Deploy**: Vercel will automatically build the static assets. Client-side SPA routing and asset caching are pre-configured in `vercel.json`.
+
+---
+
+### 2. Deploy Backend (Render / Railway / Fly.io)
+
+#### Option A: Render (Blueprint 1-Click)
+The repository includes a ready-to-use [`render.yaml`](file:///c:/Users/Moin/Downloads/projects/ledgerMind/render.yaml) specification:
+1. In Render, select **New +** → **Blueprint**.
+2. Connect this repository.
+3. Configure the environment variables:
+   - `DATABASE_URL`: Your Supabase connection string (`postgresql://postgres:...@...:5432/postgres`)
+   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `ALLOWED_ORIGINS`: Your Vercel frontend URL (e.g. `https://ledgerforge.vercel.app`)
+
+#### Option B: Railway / Fly.io / Docker
+The repository includes a production-ready [`Dockerfile`](file:///c:/Users/Moin/Downloads/projects/ledgerMind/Dockerfile):
+```bash
+# Build and run container locally or deploy to Railway/Fly.io
+docker build -t ledgerforge-backend .
+docker run -p 8000:8000 --env-file backend/.env ledgerforge-backend
+```
+
+---
+
 ## 🔌 API Reference
 
 Base URL: `http://localhost:8000/api/v1`

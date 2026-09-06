@@ -13,6 +13,7 @@ import {
   formatCurrency,
   CURRENCY_SYMBOLS,
 } from '../services/canonicalReport';
+import { API_BASE } from '../services/api';
 
 /**
  * ReconciliationReportModal — CFO-Grade Executive Audit Report
@@ -208,7 +209,7 @@ export function ReconciliationReportModal({ batchData, onClose }) {
   const handleExportCSV = async () => {
     try {
       if (batchId) {
-        const res = await fetch(`/api/v1/reconcile/batches/${batchId}/csv`);
+        const res = await fetch(`${API_BASE}/reconcile/batches/${batchId}/csv`);
         if (res.ok) {
           const blob = await res.blob();
           const url = URL.createObjectURL(blob);
