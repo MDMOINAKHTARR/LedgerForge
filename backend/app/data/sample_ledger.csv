@@ -1,0 +1,6 @@
+Date,Amount,Currency,Description,Reference_ID
+2026-03-01,1500.00,USD,Stripe Payout INV-9001,INV-9001
+2026-03-01,4200.50,USD,Acme Corp Invoice INV-9002,INV-9002
+2026-03-03,2500.00,USD,GlobalTech Invoice INV-9003,INV-9003
+2026-03-04,1000.00,EUR,EuroClient Services INV-9004,INV-9004
+2026-03-02,890.00,USD,Amazon Web Services Inc INV-9005,INV-9005
