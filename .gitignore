@@ -53,3 +53,7 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Cloned/nested workspace
+LedgerForge/
+frontend/public/assets/landing page.png
