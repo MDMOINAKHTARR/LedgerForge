@@ -249,6 +249,9 @@ class ReconciliationResultSchema(BaseModel):
         self.bank_transaction_id = self.bank_transaction_id or self.bank_tx_id or (self.bank_tx.id if self.bank_tx else None)
         self.ledger_transaction_id = self.ledger_transaction_id or self.ledger_tx_id or (self.ledger_tx.id if self.ledger_tx else None)
         
+        # Derive reconciliation_status only if NOT already set by the matching engine.
+        # The matching engine is the authoritative source: it sets status directly on UNMATCHED
+        # and LEDGER_ONLY records. sync_canonical_fields acts as a fallback for legacy paths.
         if not self.reconciliation_status:
             if self.match_type in [MatchType.MISSING_IN_BANK, MatchType.UNMATCHED] and not self.bank_tx:
                 self.reconciliation_status = ReconciliationStatus.LEDGER_ONLY
@@ -256,6 +259,9 @@ class ReconciliationResultSchema(BaseModel):
                 self.reconciliation_status = ReconciliationStatus.AUTO_MATCHED
             elif self.action_taken == ActionTaken.ESCALATE_TO_HUMAN:
                 self.reconciliation_status = ReconciliationStatus.HUMAN_REVIEW
+            elif not self.bank_tx and self.ledger_tx:
+                # Ledger-only records that arrive via DB reconstruction (no bank_tx set)
+                self.reconciliation_status = ReconciliationStatus.LEDGER_ONLY
             else:
                 self.reconciliation_status = ReconciliationStatus.UNMATCHED
 
@@ -282,6 +288,9 @@ class ReconciliationResultSchema(BaseModel):
                 "posting_date": self.ledger_tx.posting_date if self.ledger_tx else None,
             }
 
+        # Derive exception_types only if NOT already set by the matching engine.
+        # The matching engine sets exception_types directly as the authoritative source.
+        # This fallback handles legacy/DB reconstruction paths only.
         if not self.exception_types:
             exc_list = []
             if self.match_type and self.match_type not in [MatchType.EXACT, MatchType.EXACT_MATCH]:

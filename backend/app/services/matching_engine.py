@@ -7,7 +7,8 @@ import pandas as pd
 from backend.app.models.pydantic_models import (
     NormalizedTransaction, ReconciliationResultSchema, MatchType, ActionTaken,
     DiscrepancyDetail, AgentVersionSchema, AgentTraceSchema, HumanStatus,
-    ProcessingMethod, CandidateMatchItem, DecisionPolicy, LedgerCandidateState
+    ProcessingMethod, CandidateMatchItem, DecisionPolicy, LedgerCandidateState,
+    ReconciliationStatus
 )
 from backend.app.services.decision_engine import DecisionEngine
 from backend.app.services.llm_agent import LLMReasoningAgent
@@ -210,7 +211,9 @@ class MultiTierMatchingEngine:
                             similarity_score=0.50,
                             reason=f"Claimed duplicate for {b_ref}"
                         )],
-                        evidence_details=evidence_dict
+                        evidence_details=evidence_dict,
+                        # Authoritative exception classification — set directly, not inferred
+                        exception_types=["DUPLICATE"]
                     )
                     results.append(res)
                     continue
@@ -284,7 +287,9 @@ class MultiTierMatchingEngine:
                             similarity_score=1.0,
                             reason="Stage 1: Deterministic Exact Match"
                         )],
-                        evidence_details=evidence_dict
+                        evidence_details=evidence_dict,
+                        # Exact match — no exception
+                        exception_types=[]
                     )
                     results.append(res)
                     break
@@ -372,7 +377,9 @@ class MultiTierMatchingEngine:
                             similarity_score=confidence,
                             reason=f"Stage 2: Timing alignment ({date_diff}d lag)"
                         )],
-                        evidence_details=evidence_dict
+                        evidence_details=evidence_dict,
+                        # Settlement timing is an auto-resolving difference — classify accordingly
+                        exception_types=["TIMING_DIFFERENCE"] if date_diff > 0 else []
                     )
                     results.append(res)
                     break
@@ -432,6 +439,8 @@ class MultiTierMatchingEngine:
                         "decision": ActionTaken.ESCALATE_TO_HUMAN.value
                     }
                     
+                    # Authoritative exception type — derived from the match classification above
+                    exc_type = match_type.value if hasattr(match_type, "value") else str(match_type)
                     res_id = f"res_{uuid.uuid4().hex[:8]}"
                     res = ReconciliationResultSchema(
                         id=res_id,
@@ -466,7 +475,9 @@ class MultiTierMatchingEngine:
                             similarity_score=conf,
                             reason=f"Reference match with amount variance ({format_currency(amt_diff, b_tx.currency)})"
                         )],
-                        evidence_details=evidence_dict
+                        evidence_details=evidence_dict,
+                        # Exception type set authoritatively from the classification above (PARTIAL_PAYMENT / OVERPAYMENT / AMOUNT_VARIANCE)
+                        exception_types=[exc_type]
                     )
                     results.append(res)
                     break
@@ -576,7 +587,9 @@ class MultiTierMatchingEngine:
                         similarity_score=best_score,
                         reason="Stage 3: Corroborated Counterparty & Amount"
                     )],
-                    evidence_details=evidence_dict
+                    evidence_details=evidence_dict,
+                    # Corroborated fuzzy — human-reviewable but auto-matched above threshold
+                    exception_types=["FUZZY_MATCH_REVIEW"]
                 )
                 results.append(res)
             else:
@@ -633,7 +646,10 @@ class MultiTierMatchingEngine:
                     "Deterministic and fuzzy candidate search yielded zero credible matches"
                 ],
                 candidate_matches=[],
-                evidence_details=evidence_dict
+                evidence_details=evidence_dict,
+                # Bank transaction has no corresponding ledger entry
+                exception_types=["MISSING_IN_LEDGER"],
+                reconciliation_status=ReconciliationStatus.UNMATCHED
             )
             results.append(res)
 
@@ -644,7 +660,7 @@ class MultiTierMatchingEngine:
         for l_tx in unconsumed_ledger:
             reasoning = (
                 f"Ledger transaction {l_tx.id} ({format_currency(l_tx.amount, l_tx.currency)} - '{l_tx.description}') "
-                f"remains unconsumed in bank statement. Classified as LEDGER_ONLY."
+                f"has no corresponding bank statement entry. Classified as LEDGER_ONLY (MISSING_IN_BANK)."
             )
             res_id = f"res_{uuid.uuid4().hex[:8]}"
             res = ReconciliationResultSchema(
@@ -679,7 +695,10 @@ class MultiTierMatchingEngine:
                     "amount_match": False,
                     "confidence": 0.0,
                     "decision": ActionTaken.REJECT.value
-                }
+                },
+                # Bidirectional: ledger-only status and exception set authoritatively here
+                reconciliation_status=ReconciliationStatus.LEDGER_ONLY,
+                exception_types=["MISSING_IN_BANK"]
             )
             results.append(res)
 

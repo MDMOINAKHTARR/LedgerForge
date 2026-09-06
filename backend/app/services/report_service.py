@@ -13,7 +13,7 @@ Enforces Section 4, 5, 6, 7, 8, 13, 14, 18 of master specification:
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from backend.app.models.pydantic_models import (
-    ReconciliationResultSchema, NormalizedTransaction, ActionTaken, MatchType
+    ReconciliationResultSchema, NormalizedTransaction, ActionTaken, MatchType, ReconciliationStatus
 )
 from backend.app.core.currency import format_currency, get_currency_symbol
 
@@ -36,25 +36,27 @@ class CanonicalReportService:
         
         # 2. Currencies detected across the batch
         currencies = sorted(list({tx.currency.upper() for tx in bank_txs + ledger_txs if tx.currency}))
+
+        # Ensure all canonical fields are synced before computing any counts.
+        # The matching engine sets status/exception_types directly; sync_canonical_fields
+        # fills in any remaining fields (e.g. amounts, dates) and acts as a fallback
+        # for results arriving from DB reconstruction.
+        for r in results:
+            r.sync_canonical_fields()
         
-        # 3. Reconciliation outcomes
-        auto_matched = [r for r in results if r.action_taken == ActionTaken.AUTO_RECONCILE]
-        human_review = [r for r in results if r.action_taken == ActionTaken.ESCALATE_TO_HUMAN]
-        unmatched = [r for r in results if r.action_taken == ActionTaken.REJECT or r.match_type == MatchType.UNMATCHED]
-        
-        # Determine ledger-only entries (unconsumed by any auto-match)
-        consumed_ledger_ids = {r.ledger_tx_id for r in auto_matched if r.ledger_tx_id}
-        review_ledger_ids = {r.ledger_tx_id for r in human_review if r.ledger_tx_id}
-        unconsumed_ledger_txs = [
-            l for l in ledger_txs if l.id not in consumed_ledger_ids and l.id not in review_ledger_ids
-        ]
+        # 3. Reconciliation outcomes — split by canonical reconciliation_status (not action_taken).
+        # This correctly separates LEDGER_ONLY records from UNMATCHED bank transactions.
+        auto_matched  = [r for r in results if r.reconciliation_status == ReconciliationStatus.AUTO_MATCHED]
+        human_review  = [r for r in results if r.reconciliation_status == ReconciliationStatus.HUMAN_REVIEW]
+        unmatched     = [r for r in results if r.reconciliation_status == ReconciliationStatus.UNMATCHED]
+        ledger_only_r = [r for r in results if r.reconciliation_status == ReconciliationStatus.LEDGER_ONLY]
         
         total_bank = len(bank_txs)
         total_ledger = len(ledger_txs)
         auto_count = len(auto_matched)
         review_count = len(human_review)
         unmatched_count = len(unmatched)
-        ledger_only_count = len(unconsumed_ledger_txs)
+        ledger_only_count = len(ledger_only_r)
         
         # 4. Confidence statistics: strictly separated by category
         matched_results = auto_matched + human_review
@@ -122,7 +124,8 @@ class CanonicalReportService:
             else "Cross-currency variance not consolidated because no FX rate was provided."
         )
         
-        # 7. Exception Taxonomy counts
+        # 7. Exception Taxonomy counts — read directly from r.exception_types (authoritative).
+        # Never re-map from r.match_type; the matching engine sets exception_types at the source.
         exception_counts: Dict[str, int] = {
             "DUPLICATE": 0,
             "PARTIAL_PAYMENT": 0,
@@ -131,35 +134,37 @@ class CanonicalReportService:
             "TIMING_DIFFERENCE": 0,
             "FX_VARIANCE": 0,
             "MISSING_IN_LEDGER": 0,
-            "MISSING_IN_BANK": ledger_only_count,
+            "MISSING_IN_BANK": 0,
             "MULTIPLE_CANDIDATES": 0,
-            "LOW_CONFIDENCE": 0
+            "LOW_CONFIDENCE": 0,
+            "FUZZY_MATCH_REVIEW": 0,
         }
         
         for r in results:
-            m_val = r.match_type.value if hasattr(r.match_type, "value") else str(r.match_type)
-            if m_val in exception_counts:
-                exception_counts[m_val] += 1
-            elif m_val == "UNMATCHED":
-                exception_counts["MISSING_IN_LEDGER"] += 1
+            for exc in (r.exception_types or []):
+                exc_key = exc.upper() if isinstance(exc, str) else str(exc)
+                if exc_key in exception_counts:
+                    exception_counts[exc_key] += 1
                 
-        # 8. Detailed Comparison Analysis: Identical Source vs Reconciled vs Review vs Unmatched
+        # 8. Detailed Comparison Analysis: Identical Source vs Reconciled vs Review vs Unmatched vs Ledger-Only
         comparison_records = []
         for r in results:
-            r.sync_canonical_fields()
+            # sync_canonical_fields already called above — no second call needed
             b = r.bank_tx
             l = r.ledger_tx
-            is_auto = r.action_taken == ActionTaken.AUTO_RECONCILE
-            is_review = r.action_taken == ActionTaken.ESCALATE_TO_HUMAN
-            is_unmatched = r.action_taken == ActionTaken.REJECT or not l
+            is_auto     = r.reconciliation_status == ReconciliationStatus.AUTO_MATCHED
+            is_review   = r.reconciliation_status == ReconciliationStatus.HUMAN_REVIEW
+            is_ledger_only = r.reconciliation_status == ReconciliationStatus.LEDGER_ONLY
+            # is_unmatched: bank has no ledger match (NOT ledger-only records)
+            is_unmatched = r.reconciliation_status in (ReconciliationStatus.UNMATCHED, ReconciliationStatus.LEDGER_ONLY)
             
             curr = b.currency if (b and b.currency) else (l.currency if (l and l.currency) else None)
             b_amt = b.amount if b else 0.0
             l_amt = l.amount if l else 0.0
             amt_diff = abs(b.normalized_amount - l.normalized_amount) if (b and l) else abs(b_amt or l_amt)
             
-            # Semantic Classification
-            if is_auto and amt_diff < 0.01 and b.date == (l.effective_settlement_date if l else ""):
+            # Semantic Classification based on canonical reconciliation_status
+            if is_auto and amt_diff < 0.01 and b and l and b.date == l.effective_settlement_date:
                 cat = "IDENTICAL_SOURCE_MATCH"
                 cat_label = "SAME (IDENTICAL MATCH)"
                 badge_color = "emerald"
@@ -171,7 +176,7 @@ class CanonicalReportService:
                 cat = "REVIEW_REQUIRED"
                 cat_label = f"REVIEW ({r.match_type.value if hasattr(r.match_type, 'value') else r.match_type})"
                 badge_color = "amber"
-            elif r.reconciliation_status == "LEDGER_ONLY" or not b:
+            elif is_ledger_only or not b:
                 cat = "LEDGER_ONLY"
                 cat_label = "LEDGER ONLY (MISSING IN BANK)"
                 badge_color = "purple"
