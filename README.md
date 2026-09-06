@@ -20,6 +20,12 @@
 
 ## 🏗️ Architecture & Control Flow
 
+<div align="center">
+
+![Here is how LedgerForge works](./frontend/public/assets/how_ledgerforge_works.png)
+
+</div>
+
 LedgerForge operates under a **strictly governed hierarchical control flow**. The LLM never acts as an unconstrained authority — it functions exclusively as an advisory reasoning specialist for ambiguous edge cases, governed by deterministic safety rules and hard financial guardrails.
 
 ```mermaid

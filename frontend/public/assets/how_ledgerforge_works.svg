@@ -1,0 +1,101 @@
+<svg width="1040" height="680" viewBox="0 0 1040 680" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Dot pattern -->
+    <pattern id="dot-grid" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#cbd5e1" />
+    </pattern>
+    <!-- Arrow marker -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#0f172a"/>
+    </marker>
+    <style>
+      .title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 27px; font-weight: 500; fill: #0f172a; letter-spacing: -0.4px; }
+      .card-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 700; fill: #0f172a; letter-spacing: -0.2px; }
+      .card-desc { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 400; fill: #1e293b; line-height: 1.4; }
+      .line-label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 500; fill: #64748b; }
+      .db-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13.5px; font-weight: 700; fill: #0f172a; }
+      .db-sub { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 9.5px; font-weight: 500; fill: #64748b; }
+    </style>
+  </defs>
+
+  <!-- Background with dot grid -->
+  <rect width="1040" height="680" fill="#ffffff" />
+  <rect width="1040" height="680" fill="url(#dot-grid)" />
+
+  <!-- Main Title -->
+  <text x="520" y="60" text-anchor="middle" class="title">Here is how LedgerForge works:</text>
+
+  <!-- 1. Database Cylinder (Left) -->
+  <g transform="translate(120, 270)">
+    <!-- Cylinder body -->
+    <path d="M6 28 V86 C6 98 25 108 48 108 C71 108 90 98 90 86 V28" fill="#f1f5f9" stroke="#475569" stroke-width="1.6"/>
+    <ellipse cx="48" cy="28" rx="42" ry="17" fill="#f8fafc" stroke="#475569" stroke-width="1.6"/>
+    <text x="48" y="66" text-anchor="middle" class="db-title">Precedents</text>
+    <text x="48" y="80" text-anchor="middle" class="db-sub">.db</text>
+  </g>
+
+  <!-- 2. Matching Engine (Top Green Box) -->
+  <rect x="375" y="96" width="235" height="116" rx="4" fill="#d1f7d1" stroke="#86efac" stroke-width="1.5" />
+  <text x="492" y="126" text-anchor="middle" class="card-title">Matching Engine</text>
+  <text x="492" y="148" text-anchor="middle" class="card-desc">Ingests bank CSV &amp; GL, normalizes</text>
+  <text x="492" y="164" text-anchor="middle" class="card-desc">currencies, and executes deterministic</text>
+  <text x="492" y="180" text-anchor="middle" class="card-desc">rule-based and proximity matching.</text>
+
+  <!-- 3. LLM Specialist (Right Lavender Box) -->
+  <rect x="675" y="272" width="235" height="116" rx="4" fill="#dedcff" stroke="#b8b3f8" stroke-width="1.5" />
+  <text x="792" y="302" text-anchor="middle" class="card-title">LLM Specialist</text>
+  <text x="792" y="324" text-anchor="middle" class="card-desc">Ambiguous candidate pairs trigger</text>
+  <text x="792" y="340" text-anchor="middle" class="card-desc">advisory reasoning, generating</text>
+  <text x="792" y="356" text-anchor="middle" class="card-desc">structured evidence without authority.</text>
+
+  <!-- 4. Decision Engine (Bottom Right Peach Box) -->
+  <rect x="535" y="500" width="240" height="116" rx="4" fill="#ffe6c7" stroke="#fdba74" stroke-width="1.5" />
+  <text x="655" y="530" text-anchor="middle" class="card-title">Decision Engine</text>
+  <text x="655" y="552" text-anchor="middle" class="card-desc">Enforces zero-tolerance safety</text>
+  <text x="655" y="568" text-anchor="middle" class="card-desc">bounds: $0.05 material variance,</text>
+  <text x="655" y="584" text-anchor="middle" class="card-desc">currency parity, duplicate and anomaly</text>
+  <text x="655" y="600" text-anchor="middle" class="card-desc">lockouts.</text>
+
+  <!-- 5. Accountant Review (Bottom Left Coral Box) -->
+  <rect x="215" y="500" width="240" height="116" rx="4" fill="#ffd4d4" stroke="#fda4af" stroke-width="1.5" />
+  <text x="335" y="530" text-anchor="middle" class="card-title">Accountant Review</text>
+  <text x="335" y="552" text-anchor="middle" class="card-desc">Auditor inspects exceptions, selects</text>
+  <text x="335" y="568" text-anchor="middle" class="card-desc">structured resolution (Bank Fee, Timing</text>
+  <text x="335" y="584" text-anchor="middle" class="card-desc">Diff, Re-match), and writes lessons.</text>
+
+  <!-- 6. Agent Engineer (Center Lilac Box) -->
+  <rect x="355" y="272" width="235" height="116" rx="4" fill="#dedcff" stroke="#b8b3f8" stroke-width="1.5" />
+  <text x="472" y="302" text-anchor="middle" class="card-title">Agent Engineer</text>
+  <text x="472" y="324" text-anchor="middle" class="card-desc">Analyzes failure autopsies,</text>
+  <text x="472" y="340" text-anchor="middle" class="card-desc">benchmarks candidate policies on</text>
+  <text x="472" y="356" text-anchor="middle" class="card-desc">regression suites; requires explicit</text>
+  <text x="472" y="372" text-anchor="middle" class="card-desc">CFO promotion.</text>
+
+  <!-- Connectors & Arrows -->
+  <!-- 1. Dashed line: Precedents.db -> Matching Engine (reads) -->
+  <path d="M 175 272 L 373 158" stroke="#475569" stroke-width="1.5" stroke-dasharray="6 5" />
+  <circle cx="175" cy="272" r="3.8" fill="#ffffff" stroke="#475569" stroke-width="1.6" />
+  <circle cx="373" cy="158" r="3.8" fill="#ffffff" stroke="#475569" stroke-width="1.6" />
+  <text x="272" y="202" class="line-label" transform="rotate(-30 272 202)">reads</text>
+
+  <!-- 2. Solid Arrow: Matching Engine -> LLM Specialist -->
+  <path d="M 610 205 L 695 270" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrow)" />
+
+  <!-- 3. Solid Arrow: LLM Specialist -> Decision Engine -->
+  <path d="M 740 388 L 705 498" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrow)" />
+
+  <!-- 4. Solid Arrow: Decision Engine -> Accountant Review -->
+  <path d="M 535 558 L 457 558" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrow)" />
+
+  <!-- 5. Dashed line: Accountant Review -> Precedents.db (writes) -->
+  <path d="M 250 500 L 172 385" stroke="#475569" stroke-width="1.5" stroke-dasharray="6 5" />
+  <circle cx="250" cy="500" r="3.8" fill="#ffffff" stroke="#475569" stroke-width="1.6" />
+  <circle cx="172" cy="385" r="3.8" fill="#ffffff" stroke="#475569" stroke-width="1.6" />
+  <text x="202" y="450" class="line-label" transform="rotate(56 202 450)">writes</text>
+
+  <!-- 6. Solid Arrow: Accountant Review -> Agent Engineer -->
+  <path d="M 375 500 L 425 390" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrow)" />
+
+  <!-- 7. Solid Arrow: Agent Engineer -> LLM Specialist -->
+  <path d="M 590 330 L 673 330" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrow)" />
+</svg>
