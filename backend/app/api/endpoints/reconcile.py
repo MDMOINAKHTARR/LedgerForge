@@ -188,12 +188,21 @@ async def upload_and_reconcile(
                 }
                 for tx in ledger_txs
             ])
+            valid_bank_ids = {f"{batch_id}_bank_{tx.id}" for tx in bank_txs}
+            matches_batch = []
+            decisions_batch = []
+            audit_logs_batch = []
+
             for r in results:
+                b_scoped_id = f"{batch_id}_bank_{r.bank_tx_id}"
+                # Supabase table matches has a strict NOT NULL foreign key constraint on bank_transaction_id
+                if b_scoped_id not in valid_bank_ids:
+                    continue
+
                 m_type = r.match_type.value if hasattr(r.match_type, 'value') else str(r.match_type)
                 act_val = r.action_taken.value if hasattr(r.action_taken, 'value') else str(r.action_taken)
-                b_scoped_id = f"{batch_id}_bank_{r.bank_tx_id}"
                 l_scoped_id = f"{batch_id}_ledger_{r.ledger_tx_id}" if r.ledger_tx_id else None
-                supabase_service.create_match({
+                matches_batch.append({
                     "id": f"m_{r.id}",
                     "reconciliation_id": batch_id,
                     "bank_transaction_id": b_scoped_id,
@@ -204,7 +213,7 @@ async def upload_and_reconcile(
                     "evidence": r.evidence or [],
                     "is_selected": True if r.ledger_tx_id else False
                 })
-                supabase_service.create_decision({
+                decisions_batch.append({
                     "id": f"d_{r.id}",
                     "reconciliation_id": batch_id,
                     "bank_transaction_id": b_scoped_id,
@@ -215,7 +224,7 @@ async def upload_and_reconcile(
                     "evidence": r.evidence or [],
                     "agent_version_id": agent_version.id
                 })
-                supabase_service.create_audit_log({
+                audit_logs_batch.append({
                     "id": f"a_{r.id}",
                     "reconciliation_id": batch_id,
                     "bank_transaction_id": b_scoped_id,
@@ -225,8 +234,16 @@ async def upload_and_reconcile(
                     "evidence": r.evidence or [],
                     "agent_version_id": agent_version.id
                 })
+
+            if matches_batch:
+                supabase_service.insert_matches(matches_batch)
+            if decisions_batch:
+                supabase_service.insert_decisions(decisions_batch)
+            if audit_logs_batch:
+                supabase_service.insert_audit_logs(audit_logs_batch)
         except Exception as s_err:
-            pass  # Fail gracefully if tables/credentials not configured yet
+            import logging
+            logging.warning(f"Supabase sync notice: {s_err}")
         
         # Generate authoritative canonical report summary
         report_summary = CanonicalReportService.generate_canonical_summary(
@@ -256,7 +273,10 @@ async def upload_and_reconcile(
         
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        import traceback
+        logging.error(f"Failed to process reconciliation upload: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Reconciliation processing error: {str(e)}")
 
 
 @router.get("/latest", response_model=Optional[ReconciliationBatchSchema])

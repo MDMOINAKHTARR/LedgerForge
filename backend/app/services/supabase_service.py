@@ -131,6 +131,23 @@ class SupabaseService:
 
     insertLedgerTransactions = insert_ledger_transactions
 
+    def insert_matches(self, matches: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Batch inserts matches into Supabase.
+        """
+        if not matches:
+            return []
+        formatted = []
+        for m in matches:
+            item = dict(m)
+            if "id" not in item or not item["id"]:
+                item["id"] = f"match_{uuid.uuid4().hex[:12]}"
+            formatted.append(item)
+        response = self.client.table("matches").insert(formatted).execute()
+        return response.data or formatted
+
+    insertMatches = insert_matches
+
     def create_match(self, match_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Records a candidate or selected match between a bank and ledger transaction.
@@ -145,6 +162,23 @@ class SupabaseService:
 
     createMatch = create_match
 
+    def insert_decisions(self, decisions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Batch inserts decisions into Supabase.
+        """
+        if not decisions:
+            return []
+        formatted = []
+        for d in decisions:
+            item = dict(d)
+            if "id" not in item or not item["id"]:
+                item["id"] = f"dec_{uuid.uuid4().hex[:12]}"
+            formatted.append(item)
+        response = self.client.table("decisions").insert(formatted).execute()
+        return response.data or formatted
+
+    insertDecisions = insert_decisions
+
     def create_decision(self, decision_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Records the final decision made by the decision engine (AUTO_RECONCILE, ESCALATE, REJECT, UNMATCHED).
@@ -158,6 +192,23 @@ class SupabaseService:
         return decision_data
 
     createDecision = create_decision
+
+    def insert_audit_logs(self, logs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Batch inserts audit logs into Supabase.
+        """
+        if not logs:
+            return []
+        formatted = []
+        for l in logs:
+            item = dict(l)
+            if "id" not in item or not item["id"]:
+                item["id"] = f"aud_{uuid.uuid4().hex[:12]}"
+            formatted.append(item)
+        response = self.client.table("audit_logs").insert(formatted).execute()
+        return response.data or formatted
+
+    insertAuditLogs = insert_audit_logs
 
     def create_audit_log(self, log_data: Dict[str, Any]) -> Dict[str, Any]:
         """

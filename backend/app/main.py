@@ -9,26 +9,15 @@ for _p in [str(_repo_root), str(_backend_root)]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-# Load environment variables
-env_path = Path(__file__).resolve().parents[1] / ".env"
-if env_path.exists():
-    load_dotenv(dotenv_path=env_path)
-else:
-    load_dotenv()
-
-from backend.app.core.database import Base, engine
+from backend.app.core.database import Base, engine, ensure_tables_created
 from backend.app.api.router import api_router
 
 # Initialize database tables safely
-try:
-    Base.metadata.create_all(bind=engine)
-except Exception as e:
-    import logging
-    logging.warning(f"Could not initialize tables at startup: {e}")
+ensure_tables_created()
 
 app = FastAPI(
     title="LedgerMind - Autonomous Bank Reconciliation Agent API",
@@ -64,6 +53,20 @@ else:
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/v1")
 app.include_router(api_router)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import logging
+    import traceback
+    logging.error(f"Global unhandled error on {request.url}: {exc}\n{traceback.format_exc()}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": f"Server Error: {str(exc)}",
+            "type": type(exc).__name__,
+            "path": str(request.url.path)
+        }
+    )
 
 @app.get("/")
 def root():

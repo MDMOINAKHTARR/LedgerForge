@@ -4,15 +4,26 @@ export const API_BASE = import.meta.env.VITE_API_URL
 
 async function parseResponseError(res, fallbackMessage = 'Request failed') {
   try {
-    const error = await res.json();
-    return error.detail || error.message || (typeof error === 'string' ? error : fallbackMessage);
-  } catch {
+    const text = await res.text();
     try {
-      const text = await res.text();
-      return text || `${fallbackMessage} (Status: ${res.status})`;
+      const error = JSON.parse(text);
+      if (typeof error === 'string') return error;
+      if (error && error.detail) {
+        return typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
+      }
+      if (error && error.message) return error.message;
     } catch {
-      return `${fallbackMessage} (Status: ${res.status})`;
+      // Non-JSON response (e.g. HTML or plaintext error from edge proxy)
+      if (text && text.trim()) {
+        const cleanText = text.replace(/<[^>]*>?/gm, '').trim();
+        if (cleanText) {
+          return `${cleanText.slice(0, 160)} (Status: ${res.status})`;
+        }
+      }
     }
+    return `${fallbackMessage} (Status: ${res.status})`;
+  } catch {
+    return `${fallbackMessage} (Status: ${res.status})`;
   }
 }
 
