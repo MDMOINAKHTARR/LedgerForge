@@ -148,6 +148,24 @@ class DecisionEngine:
                 high_risk_anomalies.append(disc_msg)
                 conflicting_evidence.append(disc_msg)
 
+        # Check 4E: Currency Conflict Override
+        if bank_tx and ledger_tx and bank_tx.currency and ledger_tx.currency:
+            if bank_tx.currency.upper() != ledger_tx.currency.upper():
+                conflict_msg = f"Currency conflict: Bank {bank_tx.currency.upper()} vs Ledger {ledger_tx.currency.upper()}"
+                if not any("Currency conflict" in a for a in high_risk_anomalies):
+                    high_risk_anomalies.append(conflict_msg)
+                    conflicting_evidence.append(conflict_msg)
+                norm_exception = "FX_VARIANCE"
+
+        # Check 4F: Direction Conflict Override
+        if bank_tx and ledger_tx and bank_tx.direction and ledger_tx.direction:
+            if bank_tx.direction.upper() != ledger_tx.direction.upper():
+                conflict_msg = f"Direction conflict: Bank is {bank_tx.direction.upper()} vs Ledger is {ledger_tx.direction.upper()}"
+                if not any("Direction conflict" in a for a in high_risk_anomalies):
+                    high_risk_anomalies.append(conflict_msg)
+                    conflicting_evidence.append(conflict_msg)
+                norm_exception = "AMOUNT_DISCREPANCY"
+
         no_high_risk = len(high_risk_anomalies) == 0
         policy_checks.append(PolicyCheckItem(
             check_name="high_risk_anomaly_override",
@@ -163,23 +181,39 @@ class DecisionEngine:
         bank_amt_str = format_currency(bank_tx.amount, currency_code) if bank_tx else "N/A"
         
         stop_details: Optional[Dict[str, Any]] = None
+
+        auto_match_eligible = bool(
+            selected_ledger_id
+            and meets_threshold
+            and has_sufficient_evidence
+            and is_allowed_exception
+            and no_high_risk
+        )
         
-        if selected_ledger_id and meets_threshold and has_sufficient_evidence and is_allowed_exception and no_high_risk:
+        if auto_match_eligible:
             final_decision = ActionTaken.AUTO_RECONCILE.value
+            recon_status = "AUTO_MATCHED"
             explanation = (
                 f"Matched to {selected_ledger_id} because amount ({bank_amt_str}), reference, "
                 f"currency ({currency_code or 'N/A'}), and transaction date align cleanly. Confidence: {conf_pct}%."
             )
-        elif not selected_ledger_id or norm_exception == "UNMATCHED":
+        elif not selected_ledger_id or norm_exception in ["UNMATCHED", "MISSING_IN_LEDGER"]:
             final_decision = ActionTaken.REJECT.value
+            recon_status = "UNMATCHED"
             confidence = 0.0  # Unmatched is not a low-confidence match; it has zero match confidence
             bank_desc = bank_tx.description if bank_tx else ""
             explanation = (
                 f"No credible ledger candidate found for bank transaction {bank_tx.id if bank_tx else ''} "
                 f"({bank_amt_str} - '{bank_desc}'). Classified as MISSING_IN_LEDGER."
             )
+        elif norm_exception in ["MISSING_IN_BANK", "LEDGER_ONLY"]:
+            final_decision = ActionTaken.REJECT.value
+            recon_status = "LEDGER_ONLY"
+            confidence = 0.0
+            explanation = f"Ledger record {selected_ledger_id} has not cleared or appeared on bank statement."
         else:
             final_decision = ActionTaken.ESCALATE_TO_HUMAN.value
+            recon_status = "HUMAN_REVIEW"
             
             # Formulate clear "Knows When to Stop" explanation
             primary_reason = high_risk_anomalies[0] if high_risk_anomalies else (
@@ -200,6 +234,8 @@ class DecisionEngine:
                 rec_action = "Investigate bank fee deduction, discount difference, or currency conversion discrepancy."
             elif norm_exception == "DUPLICATE":
                 rec_action = "Verify if bank statement contains duplicate charge/deposit or if a secondary invoice exists."
+            elif norm_exception == "FX_VARIANCE":
+                rec_action = "Verify multi-currency foreign exchange conversion rate and bank charges."
             else:
                 rec_action = "Review candidate ledger details and accept or re-assign to correct document."
                 
@@ -213,6 +249,19 @@ class DecisionEngine:
                 "recommended_action": rec_action
             }
 
+        active_exceptions = []
+        if norm_exception not in ["EXACT", "EXACT_MATCH"]:
+            active_exceptions.append(norm_exception)
+        for anomaly in high_risk_anomalies:
+            if "amount variance" in anomaly.lower() and "AMOUNT_VARIANCE" not in active_exceptions:
+                active_exceptions.append("AMOUNT_VARIANCE")
+            elif "duplicate" in anomaly.lower() and "DUPLICATE" not in active_exceptions:
+                active_exceptions.append("DUPLICATE")
+            elif "ambiguity" in anomaly.lower() and "MULTIPLE_CANDIDATES" not in active_exceptions:
+                active_exceptions.append("MULTIPLE_CANDIDATES")
+            elif "currency" in anomaly.lower() and "FX_VARIANCE" not in active_exceptions:
+                active_exceptions.append("FX_VARIANCE")
+
         return FinalDecisionOutput(
             decision=final_decision,
             confidence=confidence,
@@ -221,5 +270,9 @@ class DecisionEngine:
             policy_checks=policy_checks,
             timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
             agent_version=agent_version_id,
-            stop_reason_details=stop_details
+            stop_reason_details=stop_details,
+            match_confidence=confidence,
+            auto_match_eligible=auto_match_eligible,
+            reconciliation_status=recon_status,
+            exception_types=active_exceptions
         )

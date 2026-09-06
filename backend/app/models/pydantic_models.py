@@ -65,6 +65,8 @@ class CanonicalReconciliationResult(BaseModel):
     reconciliation_status: ReconciliationStatus
     match_method: str = "RULE"
     confidence: float = 0.0
+    match_confidence: Optional[float] = None
+    auto_match_eligible: bool = False
     exception_types: List[str] = Field(default_factory=list)
     evidence: List[str] = Field(default_factory=list)
     bank_amount: Optional[float] = None
@@ -164,6 +166,10 @@ class FinalDecisionOutput(BaseModel):
     timestamp: str
     agent_version: str
     stop_reason_details: Optional[Dict[str, Any]] = None
+    match_confidence: Optional[float] = None
+    auto_match_eligible: bool = False
+    reconciliation_status: Optional[str] = None
+    exception_types: List[str] = Field(default_factory=list)
 
 # Phase 5 Audit Trail & Timeline Models
 class AgentTimelineEvent(BaseModel):
@@ -228,6 +234,8 @@ class ReconciliationResultSchema(BaseModel):
     ledger_transaction_id: Optional[str] = None
     match_method: Optional[str] = None
     confidence: Optional[float] = None
+    match_confidence: Optional[float] = None
+    auto_match_eligible: bool = False
     exception_types: List[str] = Field(default_factory=list)
     bank_amount: Optional[float] = None
     bank_currency: Optional[str] = None
@@ -252,7 +260,11 @@ class ReconciliationResultSchema(BaseModel):
                 self.reconciliation_status = ReconciliationStatus.UNMATCHED
 
         self.match_method = self.match_method or (self.processing_method.value if hasattr(self.processing_method, "value") else str(self.processing_method))
-        self.confidence = self.confidence_score if self.confidence is None else self.confidence
+        
+        if self.match_confidence is None:
+            self.match_confidence = self.confidence_score if self.confidence is None else self.confidence
+        self.confidence = self.match_confidence
+        self.auto_match_eligible = (self.reconciliation_status == ReconciliationStatus.AUTO_MATCHED or self.action_taken == ActionTaken.AUTO_RECONCILE)
         self.explanation = self.explanation or self.reasoning
         self.recommended_action = self.recommended_action or (self.action_taken.value if hasattr(self.action_taken, "value") else str(self.action_taken))
 
@@ -288,6 +300,8 @@ class ReconciliationResultSchema(BaseModel):
             reconciliation_status=self.reconciliation_status or ReconciliationStatus.UNMATCHED,
             match_method=self.match_method or "RULE",
             confidence=self.confidence if self.confidence is not None else 0.0,
+            match_confidence=self.match_confidence if self.match_confidence is not None else self.confidence,
+            auto_match_eligible=self.auto_match_eligible,
             exception_types=self.exception_types,
             evidence=self.evidence,
             bank_amount=self.bank_amount,

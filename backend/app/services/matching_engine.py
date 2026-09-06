@@ -56,6 +56,51 @@ class MultiTierMatchingEngine:
         return re.sub(r"[^A-Za-z0-9\-]", "", str(ref)).strip().upper()
 
     @staticmethod
+    def _compute_match_confidence(
+        reference_match: bool,
+        amount_match: bool,
+        currency_match: bool,
+        direction_match: bool,
+        counterparty_similarity: float = 1.0,
+        date_diff_days: int = 0
+    ) -> float:
+        """
+        Computes match confidence based on observable evidence signals.
+        Evaluates how strongly the available evidence suggests that a bank transaction
+        corresponds to a particular ledger transaction (independent of auto-reconcile safety).
+        """
+        if not reference_match and counterparty_similarity == 0.0 and not amount_match:
+            return 0.0
+
+        score = 0.0
+        # 1. Reference signal (strongest identifier): up to 0.50
+        if reference_match:
+            score += 0.50
+        
+        # 2. Counterparty / text alignment: up to 0.25
+        score += min(0.25, counterparty_similarity * 0.25)
+        
+        # 3. Currency compatibility: +0.10
+        if currency_match:
+            score += 0.10
+            
+        # 4. Direction compatibility: +0.05
+        if direction_match:
+            score += 0.05
+            
+        # 5. Date proximity: up to +0.06
+        if date_diff_days <= 2:
+            score += 0.06
+        elif date_diff_days <= 7:
+            score += 0.03
+            
+        # 6. Exact amount signal: +0.04
+        if amount_match:
+            score += 0.04
+            
+        return round(min(1.0, score), 2)
+
+    @staticmethod
     def process_batch(
         batch_id: str,
         bank_txs: List[NormalizedTransaction],
