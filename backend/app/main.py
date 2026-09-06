@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import types
+
 # Ensure repo and backend root are in sys.path for Vercel and container runtimes
 _current = Path(__file__).resolve()
 _backend_root = _current.parents[1]  # backend/
@@ -8,6 +10,15 @@ _repo_root = _backend_root.parent    # repo root
 for _p in [str(_repo_root), str(_backend_root)]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
+
+if "backend" not in sys.modules:
+    try:
+        import backend  # type: ignore
+    except ImportError:
+        backend_pkg = types.ModuleType("backend")
+        backend_pkg.__path__ = [str(_backend_root)]
+        backend_pkg.__file__ = str(_backend_root / "__init__.py")
+        sys.modules["backend"] = backend_pkg
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
