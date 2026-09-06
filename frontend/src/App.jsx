@@ -19,6 +19,7 @@ import { AgentEvolutionView } from './components/AgentEvolutionView';
 import { CustomIngestionModal } from './components/CustomIngestionModal';
 import { Footer } from './components/Footer';
 import { ReconciliationReportModal } from './components/ReconciliationReportModal';
+import { ReconciliationPolicyView } from './components/ReconciliationPolicyView';
 import DemoComponent from './components/ui/demo';
 
 import { 
@@ -311,7 +312,7 @@ export default function App() {
                         setShowReconciliationReport(true);
                       }
                     }}
-                    onManageRules={() => setActiveTab('agent-evolution')}
+                    onManageRules={() => setActiveTab('settings')}
                   />
                 </div>
               </div>
@@ -416,25 +417,10 @@ export default function App() {
           )}
 
           {activeTab === 'settings' && (
-            <div className="forge-card p-8 space-y-4">
-              <h2 className="font-serif font-bold text-xl text-ink">Organization & Guardrail Settings</h2>
-              <div className="space-y-3 max-w-lg text-xs">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-[#FAFAF8] border border-slate-200">
-                  <div>
-                    <span className="font-bold text-ink block">Mandatory Zero False Auto-Post Enforcer</span>
-                    <span className="text-slate-500 text-[11px]">Reject automated postings if confidence falls below 90%</span>
-                  </div>
-                  <input type="checkbox" defaultChecked className="rounded text-ink focus:ring-0" />
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-[#FAFAF8] border border-slate-200">
-                  <div>
-                    <span className="font-bold text-ink block">Wire Fee Tolerance Window</span>
-                    <span className="text-slate-500 text-[11px]">Auto-flag discrepancy if fee variance exceeds $50.00</span>
-                  </div>
-                  <input type="checkbox" defaultChecked className="rounded text-ink focus:ring-0" />
-                </div>
-              </div>
-            </div>
+            <ReconciliationPolicyView
+              activeVersionId={selectedVersionId}
+              onNavigateToEvolution={() => setActiveTab('agent-evolution')}
+            />
           )}
 
           {/* Footer */}

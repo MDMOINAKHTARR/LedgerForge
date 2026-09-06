@@ -88,13 +88,23 @@ class FullPipelineService:
             db.add(db_tx)
 
         audit_items = []
+        agent_policy = agent_version.get_decision_policy() if hasattr(agent_version, "get_decision_policy") else None
         for r in results:
-            # Re-verify through DecisionEngine policy checks
-            decision_out = DecisionEngine.evaluate_reconciliation_result(r, agent_version=agent_version.id)
+            # Re-verify through DecisionEngine policy checks & Historical Memory Context
+            decision_out = DecisionEngine.evaluate_reconciliation_result(
+                r,
+                policy=agent_policy,
+                agent_version=agent_version.id,
+                db=db
+            )
             r.action_taken = ActionTaken(decision_out.decision) if decision_out.decision in [a.value for a in ActionTaken] else r.action_taken
             r.reasoning = decision_out.reason
             r.evidence = decision_out.evidence
             r.policy_checks = decision_out.policy_checks
+            r.stop_reason_details = decision_out.stop_reason_details
+            r.memory_context = decision_out.memory_context
+            r.llm_output = decision_out.llm_output
+            r.sync_canonical_fields()
 
             # Persist Result
             db_res = DBReconciliationResult(

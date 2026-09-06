@@ -99,13 +99,20 @@ def get_optimization_run_details(run_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/agent-engineer/activate/{version_id}", response_model=AgentVersionSchema)
-def set_active_agent_version(version_id: str, db: Session = Depends(get_db)):
+def set_active_agent_version(version_id: str, operator_id: Optional[str] = None, db: Session = Depends(get_db)):
     """
-    Sets designated agent version as the active production agent for reconciliation.
+    Controlled promotion endpoint: Sets designated agent version as the active production
+    agent for reconciliation subject to validation safety gates.
     """
     version = AgentRegistry.get_version_by_id(version_id)
     if not version:
         raise HTTPException(status_code=404, detail="Agent version not found")
         
-    AgentRegistry.set_active_version(version_id)
-    return AgentRegistry.get_version_by_id(version_id)
+    try:
+        promoted = AgentEngineerService.promote_candidate_version(db, version_id, operator_id=operator_id)
+        return promoted
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

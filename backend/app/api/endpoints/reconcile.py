@@ -37,24 +37,33 @@ async def upload_and_reconcile(
         
         # Get active or requested Agent Version
         agent_version = AgentRegistry.get_version_by_id(agent_version_id or "v3")
+        agent_policy = agent_version.get_decision_policy() if hasattr(agent_version, "get_decision_policy") else None
         
         # Execute Multi-Tier Matching Engine
         results, traces = MultiTierMatchingEngine.process_batch(
             batch_id=batch_id,
             bank_txs=bank_txs,
             ledger_txs=ledger_txs,
-            agent_version=agent_version
+            agent_version=agent_version,
+            policy=agent_policy
         )
         
-        # Re-verify through DecisionEngine policy checks (Hard Safety Overrides)
+        # Re-verify through DecisionEngine policy checks (Hard Safety Overrides & Historical Memory Context)
         for r in results:
-            decision_out = DecisionEngine.evaluate_reconciliation_result(r, agent_version=agent_version.id)
+            decision_out = DecisionEngine.evaluate_reconciliation_result(
+                r,
+                policy=agent_policy,
+                agent_version=agent_version.id,
+                db=db
+            )
             r.action_taken = ActionTaken(decision_out.decision) if decision_out.decision in [a.value for a in ActionTaken] else r.action_taken
             r.confidence_score = decision_out.confidence
             r.reasoning = decision_out.reason
             r.evidence = decision_out.evidence
             r.policy_checks = decision_out.policy_checks
             r.stop_reason_details = decision_out.stop_reason_details
+            r.memory_context = decision_out.memory_context
+            r.llm_output = decision_out.llm_output
             r.sync_canonical_fields()
         
         # Count stats

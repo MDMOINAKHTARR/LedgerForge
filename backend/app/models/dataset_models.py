@@ -77,5 +77,15 @@ class EvaluationMetricsResult(BaseModel):
     average_confidence: float
     avg_processing_latency_ms: float
     estimated_token_cost_usd: float
+    false_auto_match_count: int = 0
+    human_review_rate: float = 0.0
+    unmatched_rate: float = 0.0
+    currency_confusion_errors: int = 0
+    high_risk_auto_match_count: int = 0
+    duplicate_auto_match_count: int = 0
+    direction_conflict_auto_match_count: int = 0
+    amount_variance_auto_match_count: int = 0
+    safety_gates_passed: bool = True
+    safety_gate_violations: List[str] = Field(default_factory=list)
     breakdown_by_category: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     detailed_failures: List[Dict[str, Any]] = Field(default_factory=list)

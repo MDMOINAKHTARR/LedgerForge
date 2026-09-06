@@ -185,3 +185,25 @@ class DBAutopsyReport(Base):
     executive_summary = Column(Text, nullable=False)
 
 
+class DBReconciliationFeedback(Base):
+    __tablename__ = "reconciliation_feedback"
+
+    id = Column(String, primary_key=True)
+    reconciliation_result_id = Column(String, ForeignKey("reconciliation_results.id"), nullable=False, unique=True)
+    reconciliation_batch_id = Column(String, nullable=True)
+    bank_transaction_id = Column(String, nullable=True)
+    previous_decision = Column(String, nullable=True)
+    human_action = Column(String, nullable=False)
+    resolution_type = Column(String, nullable=False)
+    corrected_ledger_id = Column(String, nullable=True)
+    human_notes = Column(Text, nullable=True)
+    relevant_exception_category = Column(String, nullable=True)
+    currency = Column(String, nullable=True)
+    amount = Column(Float, nullable=True)
+    reviewer_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    result = relationship("DBReconciliationResult", backref="feedback")
+
+

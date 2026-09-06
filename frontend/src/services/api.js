@@ -37,19 +37,41 @@ export const getPendingExceptions = async (batchId = '') => {
   return res.json();
 };
 
-export const recordHumanAction = async (resultId, action, notes = '', correctedLedgerId = null) => {
+export const recordHumanAction = async (resultId, action, notes = '', correctedLedgerId = null, resolutionType = null, reviewerId = null) => {
+  const payload = { action, notes, corrected_ledger_id: correctedLedgerId };
+  if (resolutionType) payload.resolution_type = resolutionType;
+  if (reviewerId) payload.reviewer_id = reviewerId;
   const res = await fetch(`${API_BASE}/exceptions/${resultId}/human-action`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, notes, corrected_ledger_id: correctedLedgerId }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error('Failed to record human action');
+  return res.json();
+};
+
+export const getExceptionCandidates = async (resultId) => {
+  const res = await fetch(`${API_BASE}/exceptions/${resultId}/candidates`);
+  if (!res.ok) throw new Error('Failed to fetch exception candidates');
+  return res.json();
+};
+
+export const getExceptionMemory = async (resultId) => {
+  const res = await fetch(`${API_BASE}/exceptions/${resultId}/memory`);
+  if (!res.ok) return null;
   return res.json();
 };
 
 export const getAgentVersions = async () => {
   const res = await fetch(`${API_BASE}/agents/versions`);
   if (!res.ok) throw new Error('Failed to fetch agent versions');
+  return res.json();
+};
+
+export const getActivePolicy = async (versionId = '') => {
+  const url = versionId ? `${API_BASE}/agents/active-policy?version_id=${versionId}` : `${API_BASE}/agents/active-policy`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch active reconciliation policy');
   return res.json();
 };
 

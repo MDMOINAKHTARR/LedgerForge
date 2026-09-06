@@ -48,15 +48,35 @@ class AuditService:
                 metadata={"date_window_days": 7}
             ))
             
-        # Event 4: Stage 3 LLM Exception Reasoning
-        if result.processing_method == "LLM":
+
+        # Event 4B: Historical Memory Stage (Advisory precedent lookup)
+        mem_ctx = getattr(result, "memory_context", None)
+        if mem_ctx and getattr(mem_ctx, "has_memory", False):
+            trust_val = mem_ctx.trust_level.value if hasattr(mem_ctx.trust_level, "value") else str(mem_ctx.trust_level)
+            events.append(AgentTimelineEvent(
+                stage_name="HISTORICAL_MEMORY_STAGE",
+                timestamp=now_str,
+                description=(
+                    f"Historical reconciliation memory consulted: {mem_ctx.precedent_count} precedent(s) "
+                    f"found ({trust_val} trust). "
+                    f"Predominant resolution: {mem_ctx.predominant_resolution or 'None'}."
+                ),
+                metadata=mem_ctx.to_compact_audit_dict()
+            ))
+
+        # Event 4C: LLM Exception Reasoning Stage (if executed)
+        llm_out = getattr(result, "llm_output", None)
+        if llm_out:
             events.append(AgentTimelineEvent(
                 stage_name="LLM_STAGE",
                 timestamp=now_str,
-                description=f"Stage 3 LLM Exception Reasoning executed. Identified category: {result.match_type.value}.",
-                metadata={"category": result.match_type.value, "evidence_count": len(result.evidence)}
+                description=(
+                    f"Stage 3 LLM Exception Reasoning executed ({llm_out.invocation_reason or 'AMBIGUITY'}). "
+                    f"Recommendation: {llm_out.recommendation} (LLM Confidence: {llm_out.confidence*100:.1f}%)."
+                ),
+                metadata=llm_out.to_compact_audit_dict()
             ))
-            
+
         # Event 5: Decision Stage (Phase 4 Policy Checks)
         events.append(AgentTimelineEvent(
             stage_name="DECISION_STAGE",
@@ -102,6 +122,19 @@ class AuditService:
             for c in result.policy_checks
         ]
         
+        mem_ctx = getattr(result, "memory_context", None)
+        mem_provenance = mem_ctx.to_compact_audit_dict() if (mem_ctx and getattr(mem_ctx, "has_memory", False)) else None
+
+        llm_out = getattr(result, "llm_output", None)
+        llm_provenance = None
+        if llm_out:
+            llm_provenance = llm_out.to_compact_audit_dict()
+            final_dec_val = result.action_taken.value if hasattr(result.action_taken, "value") else str(result.action_taken)
+            llm_rec_val = llm_out.recommendation
+            llm_provenance["final_decision_differed"] = (final_dec_val != llm_rec_val)
+            llm_provenance["role"] = "ADVISORY_REASONING_SPECIALIST"
+            llm_provenance["authority"] = "DECISION_ENGINE"
+
         return AuditTrailItem(
             audit_id=f"aud_{uuid.uuid4().hex[:8]}",
             reconciliation_result_id=result.id,
@@ -119,7 +152,9 @@ class AuditService:
             timeline_events=timeline_events,
             timestamp=now_str,
             latency_ms=0.85,
-            estimated_cost_usd=0.00006
+            estimated_cost_usd=0.00006,
+            memory_provenance=mem_provenance,
+            llm_provenance=llm_provenance
         )
 
     @staticmethod
@@ -145,4 +180,49 @@ class AuditService:
         db.add(db_audit)
         if commit:
             db.commit()
+
+    @staticmethod
+    def record_agent_lifecycle_event(
+        db: Session,
+        event_type: str,  # "CANDIDATE_GENERATED", "CANDIDATE_VALIDATED", "AGENT_VERSION_PROMOTION"
+        agent_version: str,
+        decision: str,
+        reasoning: str,
+        metadata: Dict[str, Any],
+        operator_id: Optional[str] = None,
+        commit: bool = True
+    ) -> DBAuditLog:
+        now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+        evidence_list = [f"{k}: {v}" for k, v in metadata.items() if not isinstance(v, (dict, list))]
+        policy_checks = [{"check": "safety_gates_passed", "passed": metadata.get("safety_gates_passed", True)}]
+        timeline_events = [{
+            "stage_name": event_type,
+            "timestamp": now_str,
+            "description": reasoning,
+            "metadata": metadata,
+            "operator_id": operator_id or "system_operator"
+        }]
+
+        db_audit = DBAuditLog(
+            id=f"aud_agent_{uuid.uuid4().hex[:8]}",
+            reconciliation_result_id=f"lifecycle_{event_type.lower()}",
+            transaction_id=agent_version,
+            agent_version=agent_version,
+            processing_method="AGENT_ENGINEERING_GOVERNANCE",
+            candidate_matches=[],
+            selected_match=metadata.get("promoted_version") or agent_version,
+            confidence=1.0,
+            reasoning=reasoning,
+            evidence=evidence_list,
+            exception_type=event_type,
+            decision=decision,
+            policy_checks=policy_checks,
+            timeline_events=timeline_events,
+            latency_ms=0.0,
+            estimated_cost_usd=0.0
+        )
+        db.add(db_audit)
+        if commit:
+            db.commit()
+        return db_audit
 

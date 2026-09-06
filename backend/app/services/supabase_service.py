@@ -173,6 +173,27 @@ class SupabaseService:
 
     createAuditLog = create_audit_log
 
+    def create_or_update_feedback(self, feedback_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Upserts structured human reconciliation feedback in Supabase.
+        """
+        if "id" not in feedback_data or not feedback_data["id"]:
+            feedback_data["id"] = f"fb_{feedback_data.get('reconciliation_result_id', uuid.uuid4().hex[:12])}"
+
+        response = self.client.table("reconciliation_feedback").upsert(feedback_data).execute()
+        if response.data:
+            return response.data[0]
+        return feedback_data
+
+    def get_feedback_by_result_id(self, result_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieves feedback record by reconciliation result ID from Supabase.
+        """
+        response = self.client.table("reconciliation_feedback").select("*").eq("reconciliation_result_id", result_id).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return None
+
     # ------------------------------------------------------------------------
     # Autonomous Agent Engineering & Evolution
     # ------------------------------------------------------------------------

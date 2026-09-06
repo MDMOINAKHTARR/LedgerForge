@@ -9,6 +9,7 @@ import {
   BarChart3, 
   Share2, 
   Settings,
+  ShieldCheck,
   ArrowRight,
   Home
 } from 'lucide-react';
@@ -23,7 +24,7 @@ export function Sidebar({ activeTab, setActiveTab, pendingExceptionsCount = 0, o
     { id: 'agent-evolution', label: 'Agent Evolution', icon: Cpu },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
     { id: 'integrations', label: 'Integrations', icon: Share2 },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'settings', label: 'Policy & Safety', icon: ShieldCheck },
   ];
 
   return (

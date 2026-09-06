@@ -2,7 +2,8 @@ import time
 from typing import Dict, Any, List, Optional
 from backend.app.models.pydantic_models import (
     NormalizedTransaction, CandidateMatchItem, DecisionPolicy, PolicyCheckItem,
-    FinalDecisionOutput, ActionTaken
+    FinalDecisionOutput, ActionTaken, DecisionMemoryContext, MemoryTrustLevel,
+    LLMReasoningOutput, SourceType
 )
 from backend.app.core.currency import format_currency
 
@@ -15,23 +16,47 @@ class DecisionEngine:
     Enforces the core product principle: "KNOWS WHEN TO STOP AND ASK".
     Decoupled decision layer evaluating reconciliation proposals against configurable DecisionPolicy rules.
     High-risk financial contradictions strictly override high confidence scores.
+    Historical memory is advisory context only; it never inflates deterministic confidence or bypasses safety.
     """
     
     @staticmethod
     def evaluate_reconciliation_result(
         result: Any,
         policy: Optional[Any] = None,
-        agent_version: str = "v3"
+        agent_version: Any = "v3",
+        db: Optional[Any] = None,
+        memory_context: Optional[DecisionMemoryContext] = None,
+        llm_output: Optional[LLMReasoningOutput] = None,
+        llm_agent: Optional[Any] = None
     ) -> FinalDecisionOutput:
         """
         Convenience wrapper evaluating an existing reconciliation result through decision policy checks.
+        Wires the selected agent's configured DecisionPolicy, advisory historical memory, and controlled LLM reasoning into the decision evaluation.
         """
         actual_policy = None
-        actual_version = agent_version
-        if isinstance(policy, str):
-            actual_version = policy
-        elif isinstance(policy, DecisionPolicy):
+        actual_version = agent_version if isinstance(agent_version, str) else getattr(agent_version, "id", "v3")
+
+        if isinstance(policy, DecisionPolicy):
             actual_policy = policy
+        elif hasattr(policy, "get_decision_policy"):
+            actual_policy = policy.get_decision_policy()
+            if hasattr(policy, "id"):
+                actual_version = getattr(policy, "id", actual_version)
+        elif isinstance(policy, str):
+            actual_version = policy
+
+        # If policy not explicitly provided, resolve from agent_version
+        if actual_policy is None:
+            if hasattr(agent_version, "get_decision_policy"):
+                actual_policy = agent_version.get_decision_policy()
+            elif isinstance(agent_version, str) and agent_version:
+                try:
+                    from backend.app.services.agent_registry import AgentRegistry
+                    reg_agent = AgentRegistry.get_version_by_id(agent_version)
+                    if reg_agent and hasattr(reg_agent, "get_decision_policy"):
+                        actual_policy = reg_agent.get_decision_policy()
+                except Exception:
+                    actual_policy = None
 
         bank_tx = getattr(result, "bank_tx", None)
         ledger_tx = getattr(result, "ledger_tx", None)
@@ -40,6 +65,97 @@ class DecisionEngine:
         evidence = getattr(result, "evidence", []) or []
         match_type = getattr(result, "match_type", "EXACT")
         exception_type = match_type.value if hasattr(match_type, "value") else str(match_type)
+        norm_exc = exception_type.upper()
+
+        # Step 5: Advisory Historical Memory Retrieval for Reconciliation Exceptions
+        if memory_context is None and db is not None:
+            MEMORY_ELIGIBLE_EXCEPTIONS = {
+                "TIMING_DIFFERENCE", "TIMING_MISMATCH",
+                "AMOUNT_VARIANCE", "AMOUNT_DISCREPANCY",
+                "PARTIAL_PAYMENT", "OVERPAYMENT",
+                "DUPLICATE", "DUPLICATE_TRANSACTION",
+                "CURRENCY_ISSUE", "FX_VARIANCE",
+                "BANK_FEE",
+                "MISSING_IN_LEDGER", "MISSING_LEDGER",
+                "MISSING_IN_BANK", "MISSING_BANK",
+                "UNMATCHED", "LEDGER_ONLY",
+                "FUZZY", "MEMO_MISMATCH",
+                "MULTIPLE_CANDIDATES"
+            }
+            # Straightforward exact matches do not need memory lookup
+            is_exact = norm_exc in ["EXACT", "EXACT_MATCH"]
+            if not is_exact or norm_exc in MEMORY_ELIGIBLE_EXCEPTIONS:
+                try:
+                    from backend.app.services.memory_service import ReconciliationMemoryService
+                    mem_ctx = ReconciliationMemoryService.build_context_from_transaction(
+                        bank_tx=bank_tx,
+                        ledger_tx=ledger_tx,
+                        exception_type=exception_type
+                    )
+                    if mem_ctx and mem_ctx.currency:
+                        mem_res = ReconciliationMemoryService.retrieve_relevant_feedback(
+                            context=mem_ctx,
+                            db=db,
+                            exclude_result_id=getattr(result, "id", None)
+                        )
+                        if mem_res and mem_res.total_candidates_found > 0:
+                            memory_context = ReconciliationMemoryService.to_decision_context(mem_res)
+                except Exception:
+                    # Memory retrieval failure must never crash reconciliation decision pipeline
+                    memory_context = None
+
+        # Step 6: Controlled LLM Specialist Reasoning for Ambiguous Cases
+        cand_items = getattr(result, "candidate_matches", []) or []
+        if llm_output is None:
+            from backend.app.services.llm_agent import LLMReasoningAgent
+            agent_cls = llm_agent or LLMReasoningAgent
+            should_invoke, invoke_reason = agent_cls.should_invoke_llm(
+                bank_tx=bank_tx,
+                ledger_tx=ledger_tx,
+                match_type=exception_type,
+                confidence=confidence,
+                candidate_matches=cand_items,
+                memory_context=memory_context
+            )
+            if should_invoke:
+                cand_pool: List[NormalizedTransaction] = []
+                if ledger_tx:
+                    cand_pool.append(ledger_tx)
+                if db is not None and cand_items:
+                    for ci in cand_items:
+                        ci_id = getattr(ci, "ledger_id", None)
+                        if ci_id and not any(c.id == ci_id for c in cand_pool):
+                            from backend.app.models.db import DBTransaction
+                            b_id = getattr(result, "batch_id", "")
+                            db_t = db.query(DBTransaction).filter(
+                                (DBTransaction.id == ci_id) |
+                                ((DBTransaction.batch_id == b_id) & (DBTransaction.id == f"{b_id}_ledger_{ci_id}"))
+                            ).first()
+                            if db_t:
+                                cand_pool.append(NormalizedTransaction(
+                                    id=ci_id,
+                                    source=SourceType.LEDGER,
+                                    date=db_t.date,
+                                    amount=db_t.amount,
+                                    normalized_amount=abs(db_t.amount),
+                                    currency=db_t.currency,
+                                    description=db_t.description,
+                                    reference=db_t.reference_id
+                                ))
+                reasoning_input = agent_cls.build_reasoning_input(
+                    bank_tx=bank_tx,
+                    ledger_candidates=cand_pool,
+                    deterministic_evidence=evidence,
+                    deterministic_confidence=confidence,
+                    exception_category=exception_type,
+                    memory_context=memory_context,
+                    invocation_reason=invoke_reason or "AMBIGUITY"
+                )
+                llm_output = agent_cls.reason_exception(
+                    reasoning_input=reasoning_input,
+                    candidate_pool=cand_pool,
+                    bank_tx=bank_tx
+                )
         
         return DecisionEngine.evaluate_decision(
             bank_tx=bank_tx,
@@ -48,9 +164,11 @@ class DecisionEngine:
             confidence=confidence,
             evidence=evidence,
             exception_type=exception_type,
-            candidate_matches=getattr(result, "candidate_matches", []) or [],
+            candidate_matches=cand_items,
             policy=actual_policy,
-            agent_version_id=actual_version
+            agent_version_id=str(actual_version),
+            memory_context=memory_context,
+            llm_output=llm_output
         )
 
     @staticmethod
@@ -63,16 +181,60 @@ class DecisionEngine:
         exception_type: Optional[str] = None,
         candidate_matches: Optional[List[CandidateMatchItem]] = None,
         policy: Optional[DecisionPolicy] = None,
-        agent_version_id: str = "v3"
+        agent_version_id: str = "v3",
+        memory_context: Optional[DecisionMemoryContext] = None,
+        llm_output: Optional[LLMReasoningOutput] = None
     ) -> FinalDecisionOutput:
         
-        evidence = evidence or []
+        evidence = list(evidence or [])
         candidate_matches = candidate_matches or []
-        pol = policy or DecisionPolicy()
+
+        # Resolve policy: if not provided directly, attempt resolution via agent_version_id
+        pol = policy
+        if pol is None and agent_version_id:
+            try:
+                from backend.app.services.agent_registry import AgentRegistry
+                reg_agent = AgentRegistry.get_version_by_id(agent_version_id)
+                if reg_agent and hasattr(reg_agent, "get_decision_policy"):
+                    pol = reg_agent.get_decision_policy()
+            except Exception:
+                pol = None
+
+        if pol is None:
+            pol = DecisionPolicy()
         policy_checks: List[PolicyCheckItem] = []
         high_risk_anomalies: List[str] = []
         conflicting_evidence: List[str] = []
         supporting_evidence: List[str] = list(evidence)
+        
+        # Incorporate advisory historical memory context (if present)
+        if memory_context and memory_context.has_memory:
+            for adv in memory_context.advisory_evidence:
+                if adv not in evidence:
+                    evidence.append(adv)
+                if adv not in supporting_evidence:
+                    supporting_evidence.append(adv)
+
+        # Incorporate advisory LLM reasoning context (if present)
+        if llm_output:
+            if llm_output.reasoning:
+                llm_reason_str = f"[LLM REASONING] ({llm_output.invocation_reason or 'AMBIGUITY'}): {llm_output.reasoning}"
+                if llm_reason_str not in evidence:
+                    evidence.append(llm_reason_str)
+                if llm_reason_str not in supporting_evidence:
+                    supporting_evidence.append(llm_reason_str)
+            for fact in llm_output.evidence_used:
+                fact_str = f"[LLM EVIDENCE] {fact}"
+                if fact_str not in evidence:
+                    evidence.append(fact_str)
+            for cont in llm_output.contradictions:
+                cont_str = f"[LLM CONTRADICTION] {cont}"
+                if cont_str not in conflicting_evidence:
+                    conflicting_evidence.append(cont_str)
+            if not llm_output.validation_passed or llm_output.requires_human_review:
+                flag_msg = f"LLM specialist requires human confirmation: {llm_output.recommendation}"
+                if not any("LLM specialist" in a for a in high_risk_anomalies):
+                    high_risk_anomalies.append(flag_msg)
         
         # -------------------------------------------------------------
         # Check 1: Minimum Evidence Requirement
@@ -173,6 +335,14 @@ class DecisionEngine:
                     conflicting_evidence.append(conflict_msg)
                 norm_exception = "AMOUNT_DISCREPANCY"
 
+        # Check 4G: Historical Memory Conflict Override
+        if memory_context and (memory_context.has_conflict or memory_context.trust_level == MemoryTrustLevel.CONFLICTING):
+            breakdown_str = ", ".join(f"{k}: {v}" for k, v in (memory_context.conflict_details or {}).items())
+            conflict_msg = f"Historical memory conflict: precedent resolutions disagree ({breakdown_str})"
+            if not any("Historical memory conflict" in a for a in high_risk_anomalies):
+                high_risk_anomalies.append(conflict_msg)
+                conflicting_evidence.append(conflict_msg)
+
         no_high_risk = len(high_risk_anomalies) == 0
         policy_checks.append(PolicyCheckItem(
             check_name="high_risk_anomaly_override",
@@ -271,6 +441,16 @@ class DecisionEngine:
                 "confidence": f"{conf_pct}%",
                 "recommended_action": rec_action
             }
+            if memory_context and memory_context.has_memory:
+                stop_details["historical_memory"] = memory_context.to_compact_audit_dict()
+                if memory_context.predominant_resolution:
+                    stop_details["historical_precedent_recommendation"] = memory_context.predominant_resolution
+                    if not memory_context.has_conflict and rec_action:
+                        rec_action = f"{rec_action} (Historical precedent suggests: {memory_context.predominant_resolution})"
+                        stop_details["recommended_action"] = rec_action
+            if llm_output:
+                stop_details["llm_reasoning"] = llm_output.to_compact_audit_dict()
+                stop_details["llm_recommendation"] = llm_output.recommendation
 
         active_exceptions = []
         if norm_exception not in ["EXACT", "EXACT_MATCH"]:
@@ -297,5 +477,7 @@ class DecisionEngine:
             match_confidence=confidence,
             auto_match_eligible=auto_match_eligible,
             reconciliation_status=recon_status,
-            exception_types=active_exceptions
+            exception_types=active_exceptions,
+            memory_context=memory_context,
+            llm_output=llm_output
         )

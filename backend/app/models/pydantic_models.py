@@ -54,6 +54,20 @@ class HumanStatus(str, Enum):
     OVERRIDDEN = "OVERRIDDEN"
     REJECTED = "REJECTED"
 
+class ResolutionType(str, Enum):
+    CORRECT_MATCH = "CORRECT_MATCH"
+    WRONG_MATCH = "WRONG_MATCH"
+    PARTIAL_PAYMENT = "PARTIAL_PAYMENT"
+    BANK_FEE = "BANK_FEE"
+    TIMING_DIFFERENCE = "TIMING_DIFFERENCE"
+    DUPLICATE_TRANSACTION = "DUPLICATE_TRANSACTION"
+    MISSING_LEDGER_ENTRY = "MISSING_LEDGER_ENTRY"
+    MISSING_BANK_ENTRY = "MISSING_BANK_ENTRY"
+    AMOUNT_VARIANCE = "AMOUNT_VARIANCE"
+    CURRENCY_ISSUE = "CURRENCY_ISSUE"
+    DATA_ENTRY_ERROR = "DATA_ENTRY_ERROR"
+    OTHER = "OTHER"
+
 class ProcessingMethod(str, Enum):
     RULE = "RULE"
     FUZZY = "FUZZY"
@@ -158,6 +172,72 @@ class DecisionPolicy(BaseModel):
     escalate_on_ambiguity: bool = True
     min_evidence_count: int = 1
 
+class MemoryTrustLevel(str, Enum):
+    NONE = "NONE"
+    WEAK = "WEAK"
+    MODERATE = "MODERATE"
+    STRONG = "STRONG"
+    CONFLICTING = "CONFLICTING"
+
+class DecisionMemoryContext(BaseModel):
+    has_memory: bool = False
+    precedent_count: int = 0
+    trust_level: MemoryTrustLevel = MemoryTrustLevel.NONE
+    predominant_resolution: Optional[str] = None
+    consistency_score: float = 0.0
+    has_conflict: bool = False
+    conflict_details: Optional[Dict[str, int]] = None
+    feedback_ids: List[str] = Field(default_factory=list)
+    matched_signals: List[str] = Field(default_factory=list)
+    advisory_evidence: List[str] = Field(default_factory=list)
+
+    def to_compact_audit_dict(self) -> Dict[str, Any]:
+        return {
+            "memory_used": self.has_memory,
+            "memory_match_count": self.precedent_count,
+            "memory_trust_level": self.trust_level.value if hasattr(self.trust_level, "value") else str(self.trust_level),
+            "memory_predominant_resolution": self.predominant_resolution,
+            "memory_conflict": self.has_conflict,
+            "memory_feedback_ids": self.feedback_ids
+        }
+
+class LLMReasoningInput(BaseModel):
+    bank_tx: Dict[str, Any]
+    ledger_candidates: List[Dict[str, Any]] = Field(default_factory=list)
+    deterministic_evidence: List[str] = Field(default_factory=list)
+    deterministic_confidence: float = 0.0
+    exception_category: Optional[str] = None
+    historical_memory: Optional[Dict[str, Any]] = None
+    invocation_reason: str = "AMBIGUOUS_EXCEPTION"
+
+class LLMReasoningOutput(BaseModel):
+    recommendation: str = "ESCALATE_TO_HUMAN"
+    selected_ledger_id: Optional[str] = None
+    reasoning: str = ""
+    evidence_used: List[str] = Field(default_factory=list)
+    contradictions: List[str] = Field(default_factory=list)
+    confidence: float = 0.0
+    resolution_type: Optional[str] = None
+    requires_human_review: bool = True
+    validation_passed: bool = True
+    invocation_reason: Optional[str] = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cost_usd: float = 0.0
+    latency_ms: float = 0.0
+    thought_process: Optional[str] = None
+
+    def to_compact_audit_dict(self) -> Dict[str, Any]:
+        return {
+            "llm_used": True,
+            "llm_reason": self.invocation_reason or "AMBIGUITY",
+            "llm_recommendation": self.recommendation,
+            "llm_selected_ledger_id": self.selected_ledger_id,
+            "llm_confidence": round(self.confidence, 4),
+            "llm_requires_human_review": self.requires_human_review,
+            "llm_validation_passed": self.validation_passed
+        }
+
 class PolicyCheckItem(BaseModel):
     check_name: str
     passed: bool
@@ -176,13 +256,31 @@ class FinalDecisionOutput(BaseModel):
     auto_match_eligible: bool = False
     reconciliation_status: Optional[str] = None
     exception_types: List[str] = Field(default_factory=list)
+    memory_context: Optional[DecisionMemoryContext] = None
+    llm_output: Optional[LLMReasoningOutput] = None
 
 # Phase 5 Audit Trail & Timeline Models
 class AgentTimelineEvent(BaseModel):
-    stage_name: str  # AGENT_STARTED, MATCHING_STAGE, FUZZY_STAGE, LLM_STAGE, DECISION_STAGE, ESCALATION, FINAL_RESULT
-    timestamp: str
-    description: str
+    stage_name: str = "UNKNOWN"
+    timestamp: str = ""
+    description: str = ""
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_event(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            stage = data.get("stage_name") or data.get("stage") or "UNKNOWN"
+            desc = data.get("description") or data.get("details") or ""
+            ts = data.get("timestamp") or ""
+            meta = data.get("metadata") or {}
+            return {
+                "stage_name": stage,
+                "timestamp": ts,
+                "description": desc,
+                "metadata": meta if isinstance(meta, dict) else {}
+            }
+        return data
 
 class AuditTrailItem(BaseModel):
     audit_id: str
@@ -202,6 +300,8 @@ class AuditTrailItem(BaseModel):
     timestamp: str
     latency_ms: float
     estimated_cost_usd: float
+    memory_provenance: Optional[Dict[str, Any]] = None
+    llm_provenance: Optional[Dict[str, Any]] = None
 
 class DiscrepancyDetail(BaseModel):
     field: str
@@ -250,6 +350,8 @@ class ReconciliationResultSchema(BaseModel):
     relevant_dates: Dict[str, Optional[str]] = Field(default_factory=dict)
     explanation: Optional[str] = None
     recommended_action: Optional[str] = None
+    memory_context: Optional[DecisionMemoryContext] = None
+    llm_output: Optional[LLMReasoningOutput] = None
 
     def sync_canonical_fields(self) -> "ReconciliationResultSchema":
         self.bank_transaction_id = self.bank_transaction_id or self.bank_tx_id or (self.bank_tx.id if self.bank_tx else None)
@@ -371,6 +473,63 @@ class AgentVersionSchema(BaseModel):
     reliability_score: Optional[float] = None
     avg_cost_usd: Optional[float] = None
     avg_latency_ms: Optional[float] = None
+    decision_policy: Optional[DecisionPolicy] = None
+
+    def get_decision_policy(self) -> DecisionPolicy:
+        """
+        Returns the configured DecisionPolicy for this agent version.
+        If an explicit decision_policy is attached, it is returned directly.
+        Otherwise, constructs a DecisionPolicy from confidence_threshold
+        and matching_rules.
+        """
+        if self.decision_policy is not None:
+            return self.decision_policy
+
+        rules = self.matching_rules or {}
+
+        # 1. confidence_threshold
+        conf = self.confidence_threshold if self.confidence_threshold is not None else 0.90
+
+        # 2. max_amount_variance / max_fee_amount
+        max_amt_var = rules.get("max_amount_variance", rules.get("max_fee_amount", 50.0))
+        try:
+            max_amt_var = float(max_amt_var)
+        except (ValueError, TypeError):
+            max_amt_var = 50.0
+
+        # 3. max_date_difference_days / date_window_days
+        max_date_diff = rules.get("max_date_difference_days", rules.get("date_window_days", 7))
+        try:
+            max_date_diff = int(max_date_diff)
+        except (ValueError, TypeError):
+            max_date_diff = 7
+
+        # 4. allowed_auto_exception_types
+        allowed_types = rules.get("allowed_auto_exception_types")
+        if not allowed_types or not isinstance(allowed_types, list):
+            allowed_types = [
+                "EXACT_MATCH", "EXACT", "TIMING_MISMATCH", "TIMING_DIFFERENCE",
+                "BANK_FEE", "FX_VARIANCE", "MEMO_MISMATCH", "FUZZY"
+            ]
+
+        # 5. duplicate & ambiguity & evidence flags
+        esc_dup = rules.get("escalate_on_duplicate_candidates", rules.get("escalate_on_duplicate", True))
+        esc_ambig = rules.get("escalate_on_ambiguity", True)
+        min_ev = rules.get("min_evidence_count", 1)
+        try:
+            min_ev = int(min_ev)
+        except (ValueError, TypeError):
+            min_ev = 1
+
+        return DecisionPolicy(
+            confidence_threshold=conf,
+            max_amount_variance=max_amt_var,
+            max_date_difference_days=max_date_diff,
+            allowed_auto_exception_types=allowed_types,
+            escalate_on_duplicate_candidates=bool(esc_dup),
+            escalate_on_ambiguity=bool(esc_ambig),
+            min_evidence_count=min_ev
+        )
 
 class AgentTraceSchema(BaseModel):
     id: str
@@ -424,6 +583,64 @@ class HumanActionRequest(BaseModel):
     action: HumanStatus
     notes: Optional[str] = None
     corrected_ledger_id: Optional[str] = None
+    resolution_type: Optional[ResolutionType] = None
+    reviewer_id: Optional[str] = None
+
+class ReconciliationFeedbackSchema(BaseModel):
+    id: str
+    reconciliation_result_id: str
+    reconciliation_batch_id: Optional[str] = None
+    bank_transaction_id: Optional[str] = None
+    previous_decision: Optional[str] = None
+    human_action: HumanStatus
+    resolution_type: ResolutionType
+    corrected_ledger_id: Optional[str] = None
+    human_notes: Optional[str] = None
+    relevant_exception_category: Optional[str] = None
+    currency: Optional[str] = None
+    amount: Optional[float] = None
+    reviewer_id: Optional[str] = None
+    created_at: str
+    updated_at: Optional[str] = None
+
+class MemoryContext(BaseModel):
+    currency: str
+    amount: Optional[float] = None
+    exception_category: Optional[str] = None
+    counterparty: Optional[str] = None
+    description: Optional[str] = None
+    reference: Optional[str] = None
+    direction: Optional[str] = None
+    bank_tx_id: Optional[str] = None
+    ledger_tx_id: Optional[str] = None
+
+class HistoricalMemoryEntry(BaseModel):
+    feedback_id: str
+    reconciliation_result_id: str
+    reconciliation_batch_id: Optional[str] = None
+    bank_transaction_id: Optional[str] = None
+    resolution_type: str
+    human_action: str
+    previous_decision: Optional[str] = None
+    currency: str
+    amount: Optional[float] = None
+    similarity_score: float
+    matched_signals: List[str] = Field(default_factory=list)
+    human_notes: Optional[str] = None
+    reviewer_id: Optional[str] = None
+    created_at: str
+
+class MemoryRetrievalResult(BaseModel):
+    query_currency: str
+    query_exception_category: Optional[str] = None
+    total_candidates_found: int = 0
+    matches: List[HistoricalMemoryEntry] = Field(default_factory=list)
+    predominant_resolution: Optional[str] = None
+    consistency_score: float = 0.0
+    trust_level: MemoryTrustLevel = MemoryTrustLevel.NONE
+    has_conflict: bool = False
+    conflict_details: Optional[Dict[str, int]] = None
+    advisory_evidence: List[str] = Field(default_factory=list)
 
 class OptimizeAgentRequest(BaseModel):
     base_version_id: str = "v1"
@@ -494,6 +711,8 @@ class AgentOptimizationRunSchema(BaseModel):
     decision_rationale: str
     failure_diagnosis: FailureDiagnosisReport
     improvement_proposal: ImprovementProposal
+    safety_gates_passed: bool = True
+    safety_gate_violations: List[str] = Field(default_factory=list)
 
 class LeaderboardItemSchema(BaseModel):
     rank: int

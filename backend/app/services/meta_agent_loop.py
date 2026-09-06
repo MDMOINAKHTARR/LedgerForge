@@ -72,8 +72,8 @@ class AutonomousMetaAgentLoop:
         
         # Step 6: Select Better Version
         is_better = (new_eval.accuracy >= base_eval.accuracy and new_eval.stp_rate >= base_eval.stp_rate)
-        if is_better:
-            improved_agent.is_active = True
+        # Production immunity: candidate remains inactive until explicit operator promotion
+        improved_agent.is_active = False
             
         return {
             "base_version": base_agent.model_dump(),
