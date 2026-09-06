@@ -91,13 +91,13 @@ class CanonicalReportService:
         # Health rating calculation: Prioritizes accuracy and safety over brute STP percentage
         if false_auto_match_rate == 0.0 and auto_match_precision == 1.0:
             health_grade = "A+"
-            health_assessment = "PERFECT SAFETY: 0.0% false auto-post rate with 100% precision on all automated entries."
+            health_assessment = "AUTOMATION SAFETY GRADE: A+ (0.0% false auto-post rate with 100% precision on automated entries)"
         elif false_auto_match_rate < 0.02:
             health_grade = "A"
-            health_assessment = "HIGH SAFETY: Minor edge cases flagged; false match risk well within regulatory threshold."
+            health_assessment = "HIGH AUTOMATION SAFETY: Minor edge cases flagged; false match risk well within regulatory threshold."
         elif false_auto_match_rate < 0.05:
             health_grade = "B"
-            health_assessment = "MODERATE: Human review queue active, policy thresholds working as intended."
+            health_assessment = "MODERATE AUTOMATION SAFETY: Human review queue active, policy thresholds working as intended."
         else:
             health_grade = "D"
             health_assessment = "ELEVATED RISK: Elevated false auto-matches detected. Stricter threshold required."
@@ -148,6 +148,14 @@ class CanonicalReportService:
         }
         
         for r in results:
+            if r.reconciliation_status == ReconciliationStatus.UNMATCHED and (not r.exception_types or r.exception_types == ["UNMATCHED"]):
+                r.exception_types = ["MISSING_IN_LEDGER"]
+            elif r.reconciliation_status == ReconciliationStatus.LEDGER_ONLY and not r.exception_types:
+                r.exception_types = ["MISSING_IN_BANK"]
+            r.exception_types = [
+                "MISSING_IN_LEDGER" if (isinstance(e, str) and e.upper() == "UNMATCHED") else e
+                for e in (r.exception_types or [])
+            ]
             for exc in (r.exception_types or []):
                 exc_key = exc.upper() if isinstance(exc, str) else str(exc)
                 if exc_key in exception_counts:
@@ -165,14 +173,25 @@ class CanonicalReportService:
             # is_unmatched: bank has no ledger match (NOT ledger-only records)
             is_unmatched = r.reconciliation_status in (ReconciliationStatus.UNMATCHED, ReconciliationStatus.LEDGER_ONLY)
             
-            # Determine currencies safely and compute variance only when they match
-            b_curr = b.currency.upper() if (b and b.currency) else None
-            l_curr = l.currency.upper() if (l and l.currency) else None
+            # Determine bank and ledger values using absolute amounts derived from actual transactions
+            b_val = abs(r.bank_amount) if r.bank_amount is not None else (
+                abs(b.amount) if (b and b.amount is not None) else (
+                    abs(b.normalized_amount) if (b and b.normalized_amount != 0.0) else None
+                )
+            )
+            l_val = abs(r.ledger_amount) if r.ledger_amount is not None else (
+                abs(l.amount) if (l and l.amount is not None) else (
+                    abs(l.normalized_amount) if (l and l.normalized_amount != 0.0) else None
+                )
+            )
+
+            # Determine currencies safely and compute variance only when both exist and currencies match
+            b_curr = (r.bank_currency or (b.currency if b else None) or "").upper() or None
+            l_curr = (r.ledger_currency or (l.currency if l else None) or "").upper() or None
             curr = b_curr if b_curr else l_curr
-            b_amt = b.amount if b else 0.0
-            l_amt = l.amount if l else 0.0
-            if b_curr and l_curr and b_curr == l_curr:
-                amt_diff = abs(b.normalized_amount - l.normalized_amount) if (b and l) else abs(b_amt - l_amt)
+            
+            if b_val is not None and l_val is not None and b_curr and l_curr and b_curr == l_curr:
+                amt_diff = round(abs(b_val - l_val), 2)
             else:
                 amt_diff = None
             
@@ -199,21 +218,25 @@ class CanonicalReportService:
             elif l and l.reference_id:
                 ref = l.reference_id
 
-            exc_type_str = ", ".join(r.exception_types) if r.exception_types else "NONE"
+            clean_exc_types = [
+                "MISSING_IN_LEDGER" if (isinstance(e, str) and e.upper() == "UNMATCHED") else e
+                for e in (r.exception_types or [])
+            ]
+            exc_type_str = ", ".join(clean_exc_types) if clean_exc_types else "NONE"
             rec_action = r.recommended_action or ("AUTO_POST" if recon_status_str == "AUTO_MATCHED" else ("REVIEW" if recon_status_str == "HUMAN_REVIEW" else "INVESTIGATE"))
                 
             comparison_records.append({
                 "result_id": r.id,
-                "bank_id": b.id if b else "N/A",
-                "bank_transaction_id": b.id if b else "N/A",
-                "ledger_id": l.id if l else "N/A",
-                "ledger_transaction_id": l.id if l else "N/A",
+                "bank_id": b.id if b else (r.bank_tx_id if r.bank_tx_id else "N/A"),
+                "bank_transaction_id": b.id if b else (r.bank_tx_id if r.bank_tx_id else "N/A"),
+                "ledger_id": l.id if l else (r.ledger_tx_id if r.ledger_tx_id else "N/A"),
+                "ledger_transaction_id": l.id if l else (r.ledger_tx_id if r.ledger_tx_id else "N/A"),
                 "reconciliation_status": recon_status_str,
                 "match_method": r.match_method or "RULE",
                 "confidence": r.confidence if r.confidence is not None else r.confidence_score,
                 "confidence_display": f"{round((r.confidence if r.confidence is not None else r.confidence_score) * 100, 1)}%" if recon_status_str in ["AUTO_MATCHED", "HUMAN_REVIEW"] else "0.0%",
                 "exception_type": exc_type_str,
-                "exception_types": r.exception_types or [],
+                "exception_types": clean_exc_types,
                 "recommended_action": rec_action,
                 "category": cat,
                 "category_label": cat_label,
@@ -221,20 +244,20 @@ class CanonicalReportService:
                 "bank_date": b.date if b else "N/A",
                 "bank_value_date": b.value_date if (b and b.value_date) else "N/A",
                 "bank_desc": b.description if b else "N/A",
-                "bank_amount": b_amt if b else None,
-                "bank_currency": b.currency if b else None,
-                "bank_amount_formatted": format_currency(b_amt, b.currency) if b else "N/A",
+                "bank_amount": b_val,
+                "bank_currency": b_curr,
+                "bank_amount_formatted": format_currency(b_val, b_curr) if b_val is not None else "N/A",
                 "ledger_document_date": l.document_date if (l and l.document_date) else "N/A",
                 "ledger_posting_date": l.posting_date if (l and l.posting_date) else "N/A",
                 "ledger_date": l.effective_settlement_date if l else "N/A",
                 "ledger_desc": l.description if l else "N/A",
                 "ledger_counterparty": l_counterparty,
                 "reference": ref,
-                "ledger_amount": l_amt if l else None,
-                "ledger_currency": l.currency if l else None,
-                "ledger_amount_formatted": format_currency(l_amt, l.currency) if l else "N/A",
+                "ledger_amount": l_val,
+                "ledger_currency": l_curr,
+                "ledger_amount_formatted": format_currency(l_val, l_curr) if l_val is not None else "N/A",
                 "variance": amt_diff,
-                "variance_formatted": format_currency(amt_diff, curr) if amt_diff is not None else "N/A",
+                "variance_formatted": format_currency(amt_diff, b_curr or curr) if amt_diff is not None else "N/A",
                 "reasoning": r.explanation or r.reasoning,
                 "explanation": r.explanation or r.reasoning,
                 "relevant_dates": r.relevant_dates,
@@ -280,7 +303,7 @@ class CanonicalReportService:
     def generate_csv_report(summary: Dict[str, Any]) -> str:
         """Generates machine and audit-ready CSV conforming strictly to Section 4, 13, 14 & 20."""
         rows = [
-            ["=== LEDGER MIND — AUTONOMOUS RECONCILIATION AUDIT REPORT ==="],
+            ["=== LEDGER FORGE — AUTONOMOUS RECONCILIATION AUDIT REPORT ==="],
             ["Batch ID", summary["batch_id"]],
             ["Generated At", summary["created_at"]],
             ["Agent Version", summary["agent_version_id"]],
@@ -308,7 +331,7 @@ class CanonicalReportService:
             ["Average Confidence (Matched Items)", f"{summary['quality_metrics']['avg_confidence_matched']}%"],
             ["Average Confidence (Auto Matches)", f"{summary['quality_metrics']['avg_confidence_auto_matched']}%"],
             ["Average Confidence (Human Reviews)", f"{summary['quality_metrics']['avg_confidence_human_review']}%"],
-            ["Safety Grade", f"{summary['quality_metrics']['health_grade']} ({summary['quality_metrics']['health_assessment']})"],
+            ["Safety Grade", f"{summary['quality_metrics']['health_grade']} - {summary['quality_metrics']['health_assessment']}"],
             [""],
             ["CURRENCY BREAKDOWN (Strictly Unconsolidated Without FX)"]
         ]
@@ -354,16 +377,18 @@ class CanonicalReportService:
         ])
         
         for rec in summary["comparison_records"]:
+            b_id = "N/A" if (not rec["bank_id"] or rec["bank_id"] == "N/A" or str(rec["bank_id"]).startswith("ledger_only_")) else rec["bank_id"]
+            l_id = "N/A" if (not rec["ledger_id"] or rec["ledger_id"] == "N/A") else rec["ledger_id"]
             rows.append([
-                rec["bank_id"],
-                rec["ledger_id"],
+                b_id,
+                l_id,
                 rec["reconciliation_status"],
                 rec["match_method"],
                 rec["confidence_display"],
-                rec["bank_amount_formatted"] if rec["bank_id"] != "N/A" else "N/A",
-                rec["bank_currency"] or "N/A",
-                rec["ledger_amount_formatted"] if rec["ledger_id"] != "N/A" else "N/A",
-                rec["ledger_currency"] or "N/A",
+                rec["bank_amount_formatted"] if b_id != "N/A" else "N/A",
+                rec["bank_currency"] if b_id != "N/A" else "N/A",
+                rec["ledger_amount_formatted"] if l_id != "N/A" else "N/A",
+                rec["ledger_currency"] if l_id != "N/A" else "N/A",
                 rec["variance_formatted"],
                 rec["exception_type"],
                 rec["bank_date"],

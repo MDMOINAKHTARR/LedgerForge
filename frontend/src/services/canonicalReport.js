@@ -81,8 +81,14 @@ export function getCanonicalSummary(batchData) {
   };
 
   results.forEach(r => {
-    (r.exception_types || []).forEach(exc => {
-      const k = String(exc).toUpperCase();
+    let exList = r.exception_types || [];
+    if (exList.length === 0) {
+      if (r.reconciliation_status === 'UNMATCHED') exList = ['MISSING_IN_LEDGER'];
+      else if (r.reconciliation_status === 'LEDGER_ONLY') exList = ['MISSING_IN_BANK'];
+    }
+    exList.forEach(exc => {
+      let k = String(exc).toUpperCase();
+      if (k === 'UNMATCHED') k = 'MISSING_IN_LEDGER';
       if (k in exceptionCounts) exceptionCounts[k]++;
     });
   });
@@ -111,15 +117,27 @@ export function getCanonicalSummary(batchData) {
     comparison_records: results.map(r => {
       const b = r.bank_tx;
       const l = r.ledger_tx;
-      const bAmt = b?.amount !== undefined ? b.amount : r.bank_amount;
-      const lAmt = l?.amount !== undefined ? l.amount : r.ledger_amount;
-      const bCurr = (b?.currency || r.bank_currency || '').toUpperCase();
-      const lCurr = (l?.currency || r.ledger_currency || '').toUpperCase();
+      const bAmt = r.bank_amount !== undefined && r.bank_amount !== null
+        ? Math.abs(r.bank_amount)
+        : (b?.amount !== undefined && b?.amount !== null ? Math.abs(b.amount) : (b?.normalized_amount ? Math.abs(b.normalized_amount) : null));
+      const lAmt = r.ledger_amount !== undefined && r.ledger_amount !== null
+        ? Math.abs(r.ledger_amount)
+        : (l?.amount !== undefined && l?.amount !== null ? Math.abs(l.amount) : (l?.normalized_amount ? Math.abs(l.normalized_amount) : null));
+      const bCurr = (r.bank_currency || b?.currency || '').toUpperCase();
+      const lCurr = (r.ledger_currency || l?.currency || '').toUpperCase();
       const matchCurr = bCurr === lCurr && bCurr !== '';
-      const variance = matchCurr && bAmt !== undefined && lAmt !== undefined ? Math.abs(Math.abs(bAmt) - Math.abs(lAmt)) : null;
+      const variance = matchCurr && bAmt !== null && lAmt !== null ? Math.abs(bAmt - lAmt) : null;
 
       const lCounterparty = l?.counterparty || l?.raw_data?.counterparty || l?.description || 'N/A';
       const ref = b?.reference_id || l?.reference_id || b?.reference || l?.reference || 'N/A';
+
+      let excTypes = r.exception_types || [];
+      if (excTypes.length === 0) {
+        if (r.reconciliation_status === 'UNMATCHED') excTypes = ['MISSING_IN_LEDGER'];
+        else if (r.reconciliation_status === 'LEDGER_ONLY') excTypes = ['MISSING_IN_BANK'];
+      }
+      const cleanExc = excTypes.map(e => String(e).toUpperCase() === 'UNMATCHED' ? 'MISSING_IN_LEDGER' : e);
+      const excTypeStr = cleanExc.length > 0 ? cleanExc.join(', ') : 'NONE';
 
       return {
         bank_id: b?.id || r.bank_tx_id || 'N/A',
@@ -127,12 +145,12 @@ export function getCanonicalSummary(batchData) {
         reconciliation_status: r.reconciliation_status || 'UNMATCHED',
         match_method: r.match_method || 'RULE',
         confidence_display: r.confidence_score !== undefined ? `${(r.confidence_score * 100).toFixed(1)}%` : '0.0%',
-        bank_amount_formatted: bAmt !== undefined && bAmt !== null ? formatCurrency(bAmt, bCurr) : 'N/A',
+        bank_amount_formatted: bAmt !== null ? formatCurrency(bAmt, bCurr) : 'N/A',
         bank_currency: bCurr || 'N/A',
-        ledger_amount_formatted: lAmt !== undefined && lAmt !== null ? formatCurrency(lAmt, lCurr) : 'N/A',
+        ledger_amount_formatted: lAmt !== null ? formatCurrency(lAmt, lCurr) : 'N/A',
         ledger_currency: lCurr || 'N/A',
         variance_formatted: variance !== null ? formatCurrency(variance, bCurr) : 'N/A',
-        exception_type: (r.exception_types && r.exception_types.length > 0) ? r.exception_types.join(', ') : 'NONE',
+        exception_type: excTypeStr,
         bank_date: b?.date || 'N/A',
         bank_value_date: b?.value_date || b?.date || 'N/A',
         ledger_document_date: l?.document_date || l?.date || 'N/A',
@@ -149,7 +167,7 @@ export function getCanonicalSummary(batchData) {
 
 export function generateCanonicalCSV(summary) {
   const rows = [
-    ["=== LEDGER MIND — AUTONOMOUS RECONCILIATION AUDIT REPORT ==="],
+    ["=== LEDGER FORGE — AUTONOMOUS RECONCILIATION AUDIT REPORT ==="],
     ["Batch ID", summary.batch_id],
     ["Generated At", summary.created_at],
     ["Agent Version", summary.agent_version_id],
@@ -196,16 +214,18 @@ export function generateCanonicalCSV(summary) {
   ];
 
   (summary.comparison_records || []).forEach(rec => {
+    const bId = (!rec.bank_id || rec.bank_id === "N/A" || String(rec.bank_id).startsWith("ledger_only_")) ? "N/A" : rec.bank_id;
+    const lId = (!rec.ledger_id || rec.ledger_id === "N/A") ? "N/A" : rec.ledger_id;
     rows.push([
-      rec.bank_id,
-      rec.ledger_id,
+      bId,
+      lId,
       rec.reconciliation_status,
       rec.match_method,
       rec.confidence_display,
-      rec.bank_amount_formatted,
-      rec.bank_currency || "N/A",
-      rec.ledger_amount_formatted,
-      rec.ledger_currency || "N/A",
+      bId !== "N/A" ? rec.bank_amount_formatted : "N/A",
+      bId !== "N/A" ? (rec.bank_currency || "N/A") : "N/A",
+      lId !== "N/A" ? rec.ledger_amount_formatted : "N/A",
+      lId !== "N/A" ? (rec.ledger_currency || "N/A") : "N/A",
       rec.variance_formatted,
       rec.exception_type,
       rec.bank_date,

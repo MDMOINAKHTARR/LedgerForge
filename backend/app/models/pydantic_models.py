@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from enum import Enum
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 class SourceType(str, Enum):
     BANK = "BANK"
@@ -106,6 +106,12 @@ class NormalizedTransaction(BaseModel):
     @property
     def reference_id(self) -> Optional[str]:
         return self.reference or self.payment_reference or self.document_id or self.invoice_id
+
+    @model_validator(mode="after")
+    def populate_normalized_amount(self) -> "NormalizedTransaction":
+        if self.normalized_amount == 0.0 and self.amount != 0.0:
+            self.normalized_amount = abs(self.amount)
+        return self
 
     @property
     def raw_data(self) -> Dict[str, Any]:
@@ -293,11 +299,26 @@ class ReconciliationResultSchema(BaseModel):
         # This fallback handles legacy/DB reconstruction paths only.
         if not self.exception_types:
             exc_list = []
-            if self.match_type and self.match_type not in [MatchType.EXACT, MatchType.EXACT_MATCH]:
-                exc_list.append(self.match_type.value if hasattr(self.match_type, "value") else str(self.match_type))
+            if self.reconciliation_status == ReconciliationStatus.UNMATCHED or self.match_type == MatchType.UNMATCHED:
+                exc_list.append("MISSING_IN_LEDGER")
+            elif self.reconciliation_status == ReconciliationStatus.LEDGER_ONLY or self.match_type == MatchType.MISSING_IN_BANK:
+                exc_list.append("MISSING_IN_BANK")
+            elif self.match_type and self.match_type not in [MatchType.EXACT, MatchType.EXACT_MATCH]:
+                m_val = self.match_type.value if hasattr(self.match_type, "value") else str(self.match_type)
+                exc_list.append(m_val)
             if self.stop_reason_details and "primary_reason" in self.stop_reason_details:
                 exc_list.append(str(self.stop_reason_details["primary_reason"]))
             self.exception_types = exc_list
+
+        # Canonical exception taxonomy: ensure UNMATCHED is never an exception type, map to MISSING_IN_LEDGER
+        self.exception_types = [
+            "MISSING_IN_LEDGER" if (isinstance(exc, str) and exc.upper() == "UNMATCHED") else exc
+            for exc in self.exception_types
+        ]
+        if self.reconciliation_status == ReconciliationStatus.UNMATCHED and not self.exception_types:
+            self.exception_types = ["MISSING_IN_LEDGER"]
+        elif self.reconciliation_status == ReconciliationStatus.LEDGER_ONLY and not self.exception_types:
+            self.exception_types = ["MISSING_IN_BANK"]
             
         return self
 

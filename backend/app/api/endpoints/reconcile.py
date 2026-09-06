@@ -299,11 +299,29 @@ def get_batch(batch_id: str, db: Session = Depends(get_db)):
         if bank_tx:
             bank_dict = {k: v for k, v in bank_tx.__dict__.items() if not k.startswith("_")}
             bank_dict["id"] = clean_bank_id
+            bank_dict["normalized_amount"] = abs(bank_tx.amount) if bank_tx.amount is not None else 0.0
 
         ledger_dict = None
         if ledger_tx:
             ledger_dict = {k: v for k, v in ledger_tx.__dict__.items() if not k.startswith("_")}
             ledger_dict["id"] = clean_ledger_id
+            ledger_dict["normalized_amount"] = abs(ledger_tx.amount) if ledger_tx.amount is not None else 0.0
+
+        # Canonical exception types taxonomy
+        m_type_str = (r.match_type.value if hasattr(r.match_type, "value") else str(r.match_type or "")).upper()
+        if m_type_str == "UNMATCHED":
+            exc_types = ["MISSING_IN_LEDGER"]
+        elif m_type_str == "MISSING_IN_BANK":
+            exc_types = ["MISSING_IN_BANK"]
+        elif m_type_str and m_type_str not in ["EXACT", "EXACT_MATCH"]:
+            exc_types = [m_type_str]
+        else:
+            exc_types = []
+
+        b_amt = abs(bank_tx.amount) if (bank_tx and bank_tx.amount is not None) else None
+        b_curr = bank_tx.currency if bank_tx else None
+        l_amt = abs(ledger_tx.amount) if (ledger_tx and ledger_tx.amount is not None) else None
+        l_curr = ledger_tx.currency if ledger_tx else None
 
         results_list.append({
             "id": r.id,
@@ -320,7 +338,12 @@ def get_batch(batch_id: str, db: Session = Depends(get_db)):
             "discrepancy_details": r.discrepancy_details or [],
             "human_status": r.human_status or "PENDING",
             "human_notes": r.human_notes,
-            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else ""
+            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+            "bank_amount": b_amt,
+            "bank_currency": b_curr,
+            "ledger_amount": l_amt,
+            "ledger_currency": l_curr,
+            "exception_types": exc_types,
         })
         
     # Reconstruct NormalizedTransaction objects for report summary
