@@ -93,17 +93,4 @@ def get_system_notifications(db: Session = Depends(get_db)):
         import logging
         logging.warning(f"Could not load dynamic notifications from DB: {err}")
 
-    # 4. Baseline agent status (ensures notification tray is informative even on brand new database)
-    if not notifications:
-        notifications.append({
-            "id": "agent-live-status",
-            "title": "Autonomous Agent V3 Active",
-            "message": "Continuous multi-tier matching engine active with CFO multi-currency and variance isolation.",
-            "time": "System",
-            "type": "success",
-            "unread": False,
-            "actionLabel": "Inspect Policies",
-            "targetTab": "engineer"
-        })
-
     return notifications

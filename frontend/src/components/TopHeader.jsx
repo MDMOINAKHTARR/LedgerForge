@@ -30,41 +30,36 @@ export function TopHeader({
         setNotifications([
           {
             id: `live-exc-${pendingExceptionsCount}`,
-            title: `${pendingExceptionsCount} Pending Human Exceptions`,
-            message: `${pendingExceptionsCount} transactions require human approval due to material variance or ambiguity.`,
+            title: `${pendingExceptionsCount} Pending Human Exception${pendingExceptionsCount > 1 ? 's' : ''}`,
+            message: `${pendingExceptionsCount} transaction${pendingExceptionsCount > 1 ? 's require' : ' requires'} human sign-off due to material variance or ambiguity.`,
             time: 'Active',
             type: 'alert',
             unread: true,
             actionLabel: 'Review Exceptions',
             targetTab: 'exceptions'
-          },
-          {
-            id: 'live-agent-core',
-            title: 'Autonomous Agent V3 Active',
-            message: 'Continuous multi-tier matching engine loaded with CFO safety policies and precedent memory.',
-            time: 'System',
-            type: 'success',
-            unread: false,
-            actionLabel: 'Inspect Policies',
-            targetTab: 'engineer'
           }
         ]);
       } else {
-        setNotifications([
-          {
-            id: 'live-agent-core',
-            title: 'Autonomous Agent V3 Active',
-            message: 'Continuous multi-tier matching engine loaded with CFO safety policies and precedent memory.',
-            time: 'System',
-            type: 'success',
-            unread: false,
-            actionLabel: 'Inspect Policies',
-            targetTab: 'engineer'
-          }
-        ]);
+        setNotifications([]);
       }
     } catch (err) {
       console.warn('Could not fetch dynamic notifications:', err);
+      if (pendingExceptionsCount > 0) {
+        setNotifications([
+          {
+            id: `live-exc-${pendingExceptionsCount}`,
+            title: `${pendingExceptionsCount} Pending Human Exception${pendingExceptionsCount > 1 ? 's' : ''}`,
+            message: `${pendingExceptionsCount} transaction${pendingExceptionsCount > 1 ? 's require' : ' requires'} human sign-off due to material variance or ambiguity.`,
+            time: 'Active',
+            type: 'alert',
+            unread: true,
+            actionLabel: 'Review Exceptions',
+            targetTab: 'exceptions'
+          }
+        ]);
+      } else {
+        setNotifications([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +67,9 @@ export function TopHeader({
 
   useEffect(() => {
     fetchLiveNotifications();
+    // Dynamic polling every 15 seconds for live reconciliation updates
+    const interval = setInterval(fetchLiveNotifications, 15000);
+    return () => clearInterval(interval);
   }, [pendingExceptionsCount]);
 
 
@@ -173,7 +171,12 @@ export function TopHeader({
         <div className="relative" ref={dropdownRef}>
           <button 
             id="notification-bell-btn"
-            onClick={() => setIsOpen(prev => !prev)}
+            onClick={() => {
+              setIsOpen(prev => {
+                if (!prev) fetchLiveNotifications();
+                return !prev;
+              });
+            }}
             aria-label="Open notifications"
             className={`relative p-2 rounded-full transition-all cursor-pointer ${
               isOpen 

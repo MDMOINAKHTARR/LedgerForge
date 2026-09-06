@@ -80,6 +80,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 @app.get("/")
+@app.get("/api")
+@app.get("/health")
+@app.get("/api/health")
 def root():
     return {
         "status": "online",
