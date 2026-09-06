@@ -219,11 +219,21 @@ export default function App() {
       {/* 2. Main Workspace Layout (Tailored to fit screen aspect ratio) */}
       <div className="flex-1 flex flex-col min-w-0">
         
-        {/* Top Header Bar with Home return button */}
+        {/* Top Header Bar with Home return button and fully functional Notification Bell */}
         <TopHeader
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           onReturnHome={() => setCurrentView('landing')}
+          pendingExceptionsCount={pendingExceptions?.length || 0}
+          onNavigate={(tab) => setActiveTab(tab)}
+          onOpenReport={() => {
+            if (latestReportData || batchData) {
+              setLatestReportData(latestReportData || batchData);
+              setShowReconciliationReport(true);
+            } else {
+              setActiveTab('dashboard');
+            }
+          }}
         />
 
         {/* Scrollable Main Content Container */}
