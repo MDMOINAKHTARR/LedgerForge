@@ -3,6 +3,25 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 
+// Global runtime safety: expose React and core hooks on window/globalThis
+// so that any asynchronous chunk, subcomponent, or browser evaluation has useState in scope.
+if (typeof window !== 'undefined') {
+  window.React = React;
+  window.useState = React.useState;
+  window.useEffect = React.useEffect;
+  window.useMemo = React.useMemo;
+  window.useCallback = React.useCallback;
+  window.useRef = React.useRef;
+}
+if (typeof globalThis !== 'undefined') {
+  globalThis.React = React;
+  globalThis.useState = React.useState;
+  globalThis.useEffect = React.useEffect;
+  globalThis.useMemo = React.useMemo;
+  globalThis.useCallback = React.useCallback;
+  globalThis.useRef = React.useRef;
+}
+
 // Global error boundary — catches any component crash and shows recovery UI
 class ErrorBoundary extends React.Component {
   constructor(props) {
