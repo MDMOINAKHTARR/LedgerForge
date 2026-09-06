@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
 import { 
   Search, Bell, ChevronDown, ArrowLeft, Home, 
   Check, CheckCheck, Trash2, X, AlertTriangle, 
-  CheckCircle2, ShieldAlert, Sparkles, ExternalLink, Clock, FileText
+  CheckCircle2, ShieldAlert, Sparkles, ExternalLink, Clock, FileText, RefreshCw
 } from 'lucide-react';
+import { getNotifications } from '../services/api';
 
 export function TopHeader({ 
   searchTerm, 
@@ -15,67 +15,65 @@ export function TopHeader({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState('all'); // 'all', 'unread', 'alerts'
+  const [notifications, setNotifications] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Initial rich notification dataset
-  const [notifications, setNotifications] = useState([
-    {
-      id: 'notif-1',
-      title: 'High-Priority Reconciliation Exceptions',
-      message: `${pendingExceptionsCount > 0 ? pendingExceptionsCount : 3} transactions flagged for human sign-off (material variance & duplicate candidate detection).`,
-      time: '10m ago',
-      type: 'alert',
-      unread: true,
-      actionLabel: 'Review Exceptions',
-      targetTab: 'exceptions'
-    },
-    {
-      id: 'notif-2',
-      title: 'Autonomous Agent V3 Active',
-      message: 'Multi-tier matching engine loaded with CFO safety policies and precedent memory (98.4% target STP).',
-      time: '25m ago',
-      type: 'success',
-      unread: true,
-      actionLabel: 'View Agent Policies',
-      targetTab: 'engineer'
-    },
-    {
-      id: 'notif-3',
-      title: 'Precedent Memory Applied',
-      message: 'Matched recurrent vendor SaaS wire transfer using historical human feedback precedence.',
-      time: '1h ago',
-      type: 'info',
-      unread: false,
-      actionLabel: 'Inspect Audit Trail',
-      targetTab: 'audit'
-    },
-    {
-      id: 'notif-4',
-      title: 'Canonical Report Available',
-      message: 'Authoritative GAAP/IFRS balance reconciliation summary generated.',
-      time: '2h ago',
-      type: 'report',
-      unread: false,
-      actionLabel: 'Open Canonical Report',
-      targetAction: 'open_report'
+  // Fetch real-time dynamic notifications from live backend
+  const fetchLiveNotifications = async () => {
+    try {
+      setIsLoading(true);
+      const data = await getNotifications();
+      if (Array.isArray(data) && data.length > 0) {
+        setNotifications(data);
+      } else if (pendingExceptionsCount > 0) {
+        setNotifications([
+          {
+            id: `live-exc-${pendingExceptionsCount}`,
+            title: `${pendingExceptionsCount} Pending Human Exceptions`,
+            message: `${pendingExceptionsCount} transactions require human approval due to material variance or ambiguity.`,
+            time: 'Active',
+            type: 'alert',
+            unread: true,
+            actionLabel: 'Review Exceptions',
+            targetTab: 'exceptions'
+          },
+          {
+            id: 'live-agent-core',
+            title: 'Autonomous Agent V3 Active',
+            message: 'Continuous multi-tier matching engine loaded with CFO safety policies and precedent memory.',
+            time: 'System',
+            type: 'success',
+            unread: false,
+            actionLabel: 'Inspect Policies',
+            targetTab: 'engineer'
+          }
+        ]);
+      } else {
+        setNotifications([
+          {
+            id: 'live-agent-core',
+            title: 'Autonomous Agent V3 Active',
+            message: 'Continuous multi-tier matching engine loaded with CFO safety policies and precedent memory.',
+            time: 'System',
+            type: 'success',
+            unread: false,
+            actionLabel: 'Inspect Policies',
+            targetTab: 'engineer'
+          }
+        ]);
+      }
+    } catch (err) {
+      console.warn('Could not fetch dynamic notifications:', err);
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
 
-  // Update notification 1 dynamically when pendingExceptionsCount changes
   useEffect(() => {
-    if (pendingExceptionsCount > 0) {
-      setNotifications(prev => prev.map(n => {
-        if (n.id === 'notif-1') {
-          return {
-            ...n,
-            message: `${pendingExceptionsCount} transactions require human sign-off (material variance or ambiguity).`,
-            unread: true
-          };
-        }
-        return n;
-      }));
-    }
+    fetchLiveNotifications();
   }, [pendingExceptionsCount]);
+
 
   // Click outside to close notification panel
   useEffect(() => {
@@ -210,7 +208,14 @@ export function TopHeader({
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    onClick={fetchLiveNotifications}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                    title="Refresh live notifications from database"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-600' : ''}`} />
+                  </button>
                   {unreadCount > 0 && (
                     <button
                       onClick={handleMarkAllAsRead}

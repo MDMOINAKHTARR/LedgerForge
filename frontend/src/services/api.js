@@ -268,3 +268,14 @@ export const runFullPipelineDemo = async (baseVersionId = 'v1', datasetSeed = 42
   }
   return res.json();
 };
+
+export const getNotifications = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/notifications`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+};
+
