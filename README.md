@@ -19,6 +19,56 @@
 
 ---
 
+## 🏗️ Architecture Diagram
+
+```mermaid
+graph TB
+    A[React Frontend] --> B[FastAPI Backend]
+    B --> C[Ingestion Engine]
+    B --> D[Matching Engine]
+    B --> E[Decision Engine]
+    E --> F[Audit Trail]
+    B --> G[Agent Engineer Loop]
+    G --> H[Self‑Improvement Cycle]
+    H --> B
+    subgraph Supabase
+        I[PostgreSQL DB]
+    end
+    B --> I
+    A --> I
+```
+
+## 🤖 Agent Architecture & Self‑Improvement Loop
+
+```mermaid
+flowchart TD
+    N1["🎯 Goal Definition & Data Ingestion"]
+    N2["🤖 Run Base Agent (V1) on Synthetic Dataset"]
+    N3["📊 Compute Metrics & Failure Analysis"]
+    N4["⚙️ Synthesize New Agent Spec (V2)"]
+    N5["⚡ Benchmark Candidate Agent"]
+    
+    D{"⚖️ Decision: V2 Metrics > V1?"}
+    
+    YesNode["🚀 Promote to Leaderboard"]
+    NoNode["🔍 Trigger Agent Autopsy"]
+
+    N1 --> N2
+    N2 --> N3
+    N3 --> N4
+    N4 --> N5
+    N5 --> D
+
+    D -- "Yes (Better Performance)" --> YesNode
+    D -- "No (Regressions Found)" --> NoNode
+
+    NoNode --> |"Iterative Failure Feedback"| N4
+```
+
+The **Agent Engineer Loop** continuously refines the reconciliation agent. It starts by deploying a baseline version (V1) on a synthetic dataset to establish a performance baseline. Metrics are collected, and failure cases are analyzed to isolate weaknesses. A new specification (V2) is synthesized and benchmarked against V1. If the candidate surpasses the baseline across accuracy, precision, and risk metrics, it is promoted to production; otherwise, an automated autopsy provides targeted feedback back into the synthesis engine.
+
+---
+
 ## 📖 Overview
 
 **LedgerForge** (codename: *LedgerMind*) is a production-grade **autonomous agentic AI system** for bank reconciliation. It replaces time-consuming, error-prone manual reconciliation workflows with a self-improving multi-agent pipeline that matches bank transactions against ledger entries, escalates ambiguous cases to humans, and continuously evolves its own matching strategy.
@@ -27,7 +77,6 @@
 > The system never auto-reconciles transactions it isn't confident about. High model confidence **never** overrides a hard financial discrepancy.
 
 ---
-
 ## ✨ Key Features
 
 | Feature | Description |
