@@ -1,4 +1,14 @@
+import sys
 from pathlib import Path
+
+# Ensure repo and backend root are in sys.path for Vercel and container runtimes
+_current = Path(__file__).resolve()
+_backend_root = _current.parents[1]  # backend/
+_repo_root = _backend_root.parent    # repo root
+for _p in [str(_repo_root), str(_backend_root)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
