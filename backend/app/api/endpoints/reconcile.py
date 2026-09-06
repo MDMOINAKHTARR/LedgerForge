@@ -54,6 +54,7 @@ async def upload_and_reconcile(
             r.evidence = decision_out.evidence
             r.policy_checks = decision_out.policy_checks
             r.stop_reason_details = decision_out.stop_reason_details
+            r.sync_canonical_fields()
         
         # Count stats
         auto_count = sum(1 for r in results if r.action_taken == ActionTaken.AUTO_RECONCILE)

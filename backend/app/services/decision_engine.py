@@ -144,7 +144,7 @@ class DecisionEngine:
             "MISSING_LEDGER", "MISSING_BANK"
         ]:
             if not any(norm_exception in a for a in high_risk_anomalies):
-                disc_msg = f"Financial exception category '{norm_exception}' requires human confirmation"
+                disc_msg = f"Financial exception category '{norm_exception}' requires mandatory human auditor confirmation"
                 high_risk_anomalies.append(disc_msg)
                 conflicting_evidence.append(disc_msg)
 
@@ -183,7 +183,7 @@ class DecisionEngine:
             
             # Formulate clear "Knows When to Stop" explanation
             primary_reason = high_risk_anomalies[0] if high_risk_anomalies else (
-                f"confidence ({conf_pct}%) is below policy threshold ({Math_round_pct(pol.confidence_threshold)}%)"
+                f"confidence ({conf_pct}%) is below configurable policy threshold ({Math_round_pct(pol.confidence_threshold)}%)"
             )
             
             explanation = (

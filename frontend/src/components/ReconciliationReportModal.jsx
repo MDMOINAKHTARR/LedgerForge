@@ -242,8 +242,10 @@ export function ReconciliationReportModal({ batchData, onClose }) {
     }
     const isDateSame = dateDiffDays === 0;
 
-    // Strict identity: same amount, same date, exact match or auto-reconciled
-    const isSame = isAmountSame && isDateSame && (r.match_type === 'EXACT' || absDiff === 0);
+    const status = r.reconciliation_status || (r.action_taken === 'AUTO_RECONCILE' ? 'AUTO_MATCHED' : r.action_taken === 'ESCALATE_TO_HUMAN' ? 'HUMAN_REVIEW' : 'UNMATCHED');
+
+    // Strict identity: Must be AUTO_MATCHED / AUTO_RECONCILE AND amount + date match
+    const isSame = (status === 'AUTO_MATCHED' || r.action_taken === 'AUTO_RECONCILE') && isAmountSame && isDateSame;
 
     const fieldDiffs = [];
     if (!isAmountSame) {
@@ -259,29 +261,44 @@ export function ReconciliationReportModal({ batchData, onClose }) {
       fieldDiffs.push('Description string variation');
     }
 
-    let badgeText = 'SAME — IDENTICAL MATCH';
+    let badgeText = 'AUTO MATCH — IDENTICAL';
     let badgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-200';
     let badgeDot = 'bg-emerald-500';
     let diffType = 'SAME';
 
-    if (!isSame) {
+    if (status === 'HUMAN_REVIEW' || r.action_taken === 'ESCALATE_TO_HUMAN') {
+      badgeText = `HUMAN REVIEW — ${r.match_type || 'ESCALATED'}`;
+      badgeColor = 'bg-amber-50 text-amber-800 border-amber-200';
+      badgeDot = 'bg-amber-500';
+      diffType = 'HUMAN_REVIEW';
+    } else if (status === 'LEDGER_ONLY' || (!b && l)) {
+      badgeText = 'LEDGER ONLY — MISSING IN BANK';
+      badgeColor = 'bg-purple-50 text-purple-800 border-purple-200';
+      badgeDot = 'bg-purple-500';
+      diffType = 'LEDGER_ONLY';
+    } else if (status === 'UNMATCHED' || r.action_taken === 'REJECT' || !l) {
+      badgeText = 'UNMATCHED — MISSING IN LEDGER';
+      badgeColor = 'bg-rose-50 text-rose-800 border-rose-200';
+      badgeDot = 'bg-rose-500';
+      diffType = 'UNMATCHED';
+    } else if (!isSame) {
       if (!isAmountSame && !isDateSame) {
-        badgeText = 'DIFFERENT — AMOUNT & DATE';
-        badgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
-        badgeDot = 'bg-rose-500';
+        badgeText = 'AUTO MATCH — AMOUNT & DATE VARIANCE';
+        badgeColor = 'bg-amber-50 text-amber-800 border-amber-200';
+        badgeDot = 'bg-amber-500';
         diffType = 'AMOUNT_AND_DATE';
       } else if (!isAmountSame) {
-        badgeText = r.match_type === 'BANK_FEE' ? 'DIFFERENT — BANK FEE' : 'DIFFERENT — AMOUNT VARIANCE';
+        badgeText = r.match_type === 'BANK_FEE' ? 'AUTO MATCH — BANK FEE' : 'AUTO MATCH — AMOUNT VARIANCE';
         badgeColor = 'bg-amber-50 text-amber-800 border-amber-200';
         badgeDot = 'bg-amber-500';
         diffType = 'AMOUNT_VARIANCE';
       } else if (!isDateSame) {
-        badgeText = 'DIFFERENT — TIMING LAG';
+        badgeText = 'AUTO MATCH — TIMING LAG';
         badgeColor = 'bg-sky-50 text-sky-800 border-sky-200';
         badgeDot = 'bg-sky-500';
         diffType = 'TIMING_LAG';
       } else {
-        badgeText = 'DIFFERENT — MEMO / FORMAT';
+        badgeText = 'AUTO MATCH — MEMO VARIANCE';
         badgeColor = 'bg-indigo-50 text-indigo-800 border-indigo-200';
         badgeDot = 'bg-indigo-500';
         diffType = 'MEMO_DIFFERENCE';
@@ -300,9 +317,9 @@ export function ReconciliationReportModal({ batchData, onClose }) {
       badgeText,
       badgeColor,
       badgeDot,
-      summary: isSame
+      summary: r.explanation || r.reasoning || (isSame
         ? '100% agreement: Bank and Ledger match identically with 0.00 variance.'
-        : (r.reasoning || fieldDiffs.join(' • ') || 'Discrepancy detected between records.'),
+        : fieldDiffs.join(' • ') || 'Discrepancy detected between records.'),
     };
   };
 

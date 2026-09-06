@@ -146,6 +146,7 @@ class CanonicalReportService:
         # 8. Detailed Comparison Analysis: Identical Source vs Reconciled vs Review vs Unmatched
         comparison_records = []
         for r in results:
+            r.sync_canonical_fields()
             b = r.bank_tx
             l = r.ledger_tx
             is_auto = r.action_taken == ActionTaken.AUTO_RECONCILE
@@ -168,8 +169,12 @@ class CanonicalReportService:
                 badge_color = "teal"
             elif is_review:
                 cat = "REVIEW_REQUIRED"
-                cat_label = f"REVIEW ({r.match_type.value})"
+                cat_label = f"REVIEW ({r.match_type.value if hasattr(r.match_type, 'value') else r.match_type})"
                 badge_color = "amber"
+            elif r.reconciliation_status == "LEDGER_ONLY" or not b:
+                cat = "LEDGER_ONLY"
+                cat_label = "LEDGER ONLY (MISSING IN BANK)"
+                badge_color = "purple"
             else:
                 cat = "UNMATCHED"
                 cat_label = "UNMATCHED (MISSING IN LEDGER)"
@@ -179,6 +184,11 @@ class CanonicalReportService:
                 "result_id": r.id,
                 "bank_id": b.id if b else "N/A",
                 "ledger_id": l.id if l else "N/A",
+                "reconciliation_status": r.reconciliation_status.value if hasattr(r.reconciliation_status, "value") else str(r.reconciliation_status),
+                "match_method": r.match_method,
+                "confidence": r.confidence,
+                "exception_types": r.exception_types,
+                "recommended_action": r.recommended_action,
                 "category": cat,
                 "category_label": cat_label,
                 "badge_color": badge_color,
@@ -194,9 +204,10 @@ class CanonicalReportService:
                 "ledger_amount_formatted": format_currency(l_amt, l.currency) if l else "N/A",
                 "variance": amt_diff,
                 "variance_formatted": format_currency(amt_diff, curr),
-                "confidence": r.confidence_score if not is_unmatched else 0.0,
                 "confidence_display": f"{round(r.confidence_score * 100, 1)}%" if not is_unmatched else "N/A",
-                "reasoning": r.reasoning,
+                "reasoning": r.explanation or r.reasoning,
+                "explanation": r.explanation or r.reasoning,
+                "relevant_dates": r.relevant_dates,
                 "stop_reason_details": getattr(r, "stop_reason_details", None),
                 "evidence": r.evidence or []
             })

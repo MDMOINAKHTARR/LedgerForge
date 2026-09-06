@@ -4,13 +4,19 @@ import { CheckCircle2, ShieldAlert, XCircle, Activity, Gauge, Clock, DollarSign,
 export function DashboardStats({ batchData, activeAgentVersion }) {
   if (!batchData) return null;
 
-  const totalBank = batchData.total_bank_tx || batchData.results?.length || 0;
-  const autoCount = batchData.auto_reconciled_count || 0;
-  const escCount = batchData.escalated_count || 0;
+  const totalBank = batchData.total_bank_tx || batchData.results?.filter(r => r.reconciliation_status !== 'LEDGER_ONLY' && r.bank_tx_id && !r.bank_tx_id.startsWith('ledger_only_')).length || batchData.results?.length || 0;
+  
+  const autoCount = batchData.results
+    ? batchData.results.filter(r => r.reconciliation_status === 'AUTO_MATCHED' || r.action_taken === 'AUTO_RECONCILE').length
+    : (batchData.auto_reconciled_count || 0);
+
+  const escCount = batchData.results
+    ? batchData.results.filter(r => r.reconciliation_status === 'HUMAN_REVIEW' || r.action_taken === 'ESCALATE_TO_HUMAN').length
+    : (batchData.escalated_count || 0);
   
   // Unmatched: items with no matched ledger entry or flagged/rejected
   const unmatchedCount = batchData.results
-    ? batchData.results.filter((r) => !r.ledger_tx_id || r.action_taken === 'REJECT').length
+    ? batchData.results.filter(r => r.reconciliation_status === 'UNMATCHED' || (!r.ledger_tx_id && r.reconciliation_status !== 'LEDGER_ONLY') || r.action_taken === 'REJECT').length
     : (batchData.rejected_count || 0);
 
   const stpRate = totalBank > 0 ? ((autoCount / totalBank) * 100).toFixed(1) : '0.0';

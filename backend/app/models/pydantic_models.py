@@ -37,6 +37,12 @@ class LedgerCandidateState(str, Enum):
     CONSUMED = "CONSUMED"
     REVIEW_REQUIRED = "REVIEW_REQUIRED"
 
+class ReconciliationStatus(str, Enum):
+    AUTO_MATCHED = "AUTO_MATCHED"
+    HUMAN_REVIEW = "HUMAN_REVIEW"
+    UNMATCHED = "UNMATCHED"
+    LEDGER_ONLY = "LEDGER_ONLY"
+
 class ActionTaken(str, Enum):
     AUTO_RECONCILE = "AUTO_RECONCILE"
     ESCALATE_TO_HUMAN = "ESCALATE_TO_HUMAN"
@@ -52,6 +58,22 @@ class ProcessingMethod(str, Enum):
     RULE = "RULE"
     FUZZY = "FUZZY"
     LLM = "LLM"
+
+class CanonicalReconciliationResult(BaseModel):
+    bank_transaction_id: Optional[str] = None
+    ledger_transaction_id: Optional[str] = None
+    reconciliation_status: ReconciliationStatus
+    match_method: str = "RULE"
+    confidence: float = 0.0
+    exception_types: List[str] = Field(default_factory=list)
+    evidence: List[str] = Field(default_factory=list)
+    bank_amount: Optional[float] = None
+    bank_currency: Optional[str] = None
+    ledger_amount: Optional[float] = None
+    ledger_currency: Optional[str] = None
+    relevant_dates: Dict[str, Optional[str]] = Field(default_factory=dict)
+    explanation: str = ""
+    recommended_action: str = "REJECT"
 
 class NormalizedTransaction(BaseModel):
     model_config = {"populate_by_name": True}
@@ -200,6 +222,82 @@ class ReconciliationResultSchema(BaseModel):
     policy_checks: List[PolicyCheckItem] = []
     timeline_events: List[AgentTimelineEvent] = []
     stop_reason_details: Optional[Dict[str, Any]] = None
+    # Canonical Result Architecture fields
+    reconciliation_status: Optional[ReconciliationStatus] = None
+    bank_transaction_id: Optional[str] = None
+    ledger_transaction_id: Optional[str] = None
+    match_method: Optional[str] = None
+    confidence: Optional[float] = None
+    exception_types: List[str] = Field(default_factory=list)
+    bank_amount: Optional[float] = None
+    bank_currency: Optional[str] = None
+    ledger_amount: Optional[float] = None
+    ledger_currency: Optional[str] = None
+    relevant_dates: Dict[str, Optional[str]] = Field(default_factory=dict)
+    explanation: Optional[str] = None
+    recommended_action: Optional[str] = None
+
+    def sync_canonical_fields(self) -> "ReconciliationResultSchema":
+        self.bank_transaction_id = self.bank_transaction_id or self.bank_tx_id or (self.bank_tx.id if self.bank_tx else None)
+        self.ledger_transaction_id = self.ledger_transaction_id or self.ledger_tx_id or (self.ledger_tx.id if self.ledger_tx else None)
+        
+        if not self.reconciliation_status:
+            if self.match_type in [MatchType.MISSING_IN_BANK, MatchType.UNMATCHED] and not self.bank_tx:
+                self.reconciliation_status = ReconciliationStatus.LEDGER_ONLY
+            elif self.action_taken == ActionTaken.AUTO_RECONCILE:
+                self.reconciliation_status = ReconciliationStatus.AUTO_MATCHED
+            elif self.action_taken == ActionTaken.ESCALATE_TO_HUMAN:
+                self.reconciliation_status = ReconciliationStatus.HUMAN_REVIEW
+            else:
+                self.reconciliation_status = ReconciliationStatus.UNMATCHED
+
+        self.match_method = self.match_method or (self.processing_method.value if hasattr(self.processing_method, "value") else str(self.processing_method))
+        self.confidence = self.confidence_score if self.confidence is None else self.confidence
+        self.explanation = self.explanation or self.reasoning
+        self.recommended_action = self.recommended_action or (self.action_taken.value if hasattr(self.action_taken, "value") else str(self.action_taken))
+
+        if self.bank_tx:
+            self.bank_amount = self.bank_amount if self.bank_amount is not None else (self.bank_tx.normalized_amount if self.bank_tx.normalized_amount != 0.0 else abs(self.bank_tx.amount))
+            self.bank_currency = self.bank_currency or self.bank_tx.currency
+        if self.ledger_tx:
+            self.ledger_amount = self.ledger_amount if self.ledger_amount is not None else (self.ledger_tx.normalized_amount if self.ledger_tx.normalized_amount != 0.0 else abs(self.ledger_tx.amount))
+            self.ledger_currency = self.ledger_currency or self.ledger_tx.currency
+
+        if not self.relevant_dates:
+            self.relevant_dates = {
+                "bank_date": self.bank_tx.date if self.bank_tx else None,
+                "ledger_date": self.ledger_tx.date if self.ledger_tx else None,
+                "posting_date": self.ledger_tx.posting_date if self.ledger_tx else None,
+            }
+
+        if not self.exception_types:
+            exc_list = []
+            if self.match_type and self.match_type not in [MatchType.EXACT, MatchType.EXACT_MATCH]:
+                exc_list.append(self.match_type.value if hasattr(self.match_type, "value") else str(self.match_type))
+            if self.stop_reason_details and "primary_reason" in self.stop_reason_details:
+                exc_list.append(str(self.stop_reason_details["primary_reason"]))
+            self.exception_types = exc_list
+            
+        return self
+
+    def to_canonical(self) -> CanonicalReconciliationResult:
+        self.sync_canonical_fields()
+        return CanonicalReconciliationResult(
+            bank_transaction_id=self.bank_transaction_id,
+            ledger_transaction_id=self.ledger_transaction_id,
+            reconciliation_status=self.reconciliation_status or ReconciliationStatus.UNMATCHED,
+            match_method=self.match_method or "RULE",
+            confidence=self.confidence if self.confidence is not None else 0.0,
+            exception_types=self.exception_types,
+            evidence=self.evidence,
+            bank_amount=self.bank_amount,
+            bank_currency=self.bank_currency,
+            ledger_amount=self.ledger_amount,
+            ledger_currency=self.ledger_currency,
+            relevant_dates=self.relevant_dates,
+            explanation=self.explanation or "",
+            recommended_action=self.recommended_action or "REJECT"
+        )
 
 class ReconciliationBatchSchema(BaseModel):
     id: str

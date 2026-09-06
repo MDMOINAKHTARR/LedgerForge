@@ -592,7 +592,57 @@ class MultiTierMatchingEngine:
             )
             results.append(res)
 
-        # Sort results cleanly to preserve bank transaction order
+        # =========================================================================
+        # STAGE 5: Ledger-Only Unconsumed Records
+        # =========================================================================
+        unconsumed_ledger = [tx for tx in ledger_txs if ledger_state[tx.id] == LedgerCandidateState.AVAILABLE]
+        for l_tx in unconsumed_ledger:
+            reasoning = (
+                f"Ledger transaction {l_tx.id} ({format_currency(l_tx.amount, l_tx.currency)} - '{l_tx.description}') "
+                f"remains unconsumed in bank statement. Classified as LEDGER_ONLY."
+            )
+            res_id = f"res_{uuid.uuid4().hex[:8]}"
+            res = ReconciliationResultSchema(
+                id=res_id,
+                batch_id=batch_id,
+                agent_version_id=agent_version.id,
+                bank_tx_id=f"ledger_only_{l_tx.id}",
+                bank_tx=None,
+                ledger_tx_id=l_tx.id,
+                ledger_tx=l_tx,
+                match_type=MatchType.MISSING_IN_BANK,
+                confidence_score=0.0,
+                action_taken=ActionTaken.REJECT,
+                reasoning=reasoning,
+                discrepancy_details=[DiscrepancyDetail(
+                    field="bank_record",
+                    bank_val=None,
+                    ledger_val=l_tx.id,
+                    variance=round(l_tx.normalized_amount, 2),
+                    note=f"Company ledger entry unrepresented in bank statement: {format_currency(l_tx.amount, l_tx.currency)}"
+                )],
+                human_status=HumanStatus.PENDING,
+                processing_method=ProcessingMethod.RULE,
+                evidence=[
+                    f"Ledger description: {l_tx.description}",
+                    f"Amount: {format_currency(l_tx.amount, l_tx.currency)}",
+                    "Ledger transaction was not matched by any bank statement item"
+                ],
+                candidate_matches=[],
+                evidence_details={
+                    "reference_match": False,
+                    "amount_match": False,
+                    "confidence": 0.0,
+                    "decision": ActionTaken.REJECT.value
+                }
+            )
+            results.append(res)
+
+        # Ensure all result objects sync their canonical fields
+        for r in results:
+            r.sync_canonical_fields()
+
+        # Sort results cleanly to preserve bank transaction order (bank items first, then ledger-only)
         bank_id_order = {tx.id: idx for idx, tx in enumerate(bank_txs)}
         results.sort(key=lambda r: bank_id_order.get(r.bank_tx_id, 999))
 
