@@ -1,59 +1,62 @@
 import React from 'react';
-import { ArrowUpRight, Clock, Globe2, FileText, HelpCircle, Layers, Split, Copy } from 'lucide-react';
+import { ArrowUpRight, Clock, Globe2, FileText, Split, Copy, AlertTriangle, Layers } from 'lucide-react';
+import { getCanonicalSummary } from '../services/canonicalReport';
 
 export function ExceptionTypes({ batchData, onViewAll }) {
-  const results = batchData?.results || [];
-  const total = results.length;
-
-  const countForType = (typeKey) => {
-    if (total === 0) return 0;
-    return results.filter(r => {
-      const m = (r.match_type || '').toUpperCase();
-      const reasons = (r.reasoning || '').toUpperCase();
-      const disc = (r.discrepancy_details || []).map(d => JSON.stringify(d).toUpperCase()).join(' ');
-      return m.includes(typeKey) || reasons.includes(typeKey) || disc.includes(typeKey);
-    }).length;
-  };
-
-  const getPct = (cnt) => (total > 0 ? `${Math.round((cnt / total) * 100)}%` : '0%');
+  const summary = batchData ? getCanonicalSummary(batchData) : null;
+  const exceptionCounts = summary?.exception_counts || {};
+  const totalExceptions = Object.values(exceptionCounts).reduce((a, b) => a + b, 0);
 
   const categories = [
     {
-      label: 'Timing Mismatch',
-      pct: getPct(countForType('TIMING')),
-      icon: Clock,
-      iconBg: 'bg-pastel-yellow text-amber-700',
+      key: 'DUPLICATE',
+      label: 'Duplicate Entry',
+      count: exceptionCounts['DUPLICATE'] || 0,
+      icon: Copy,
+      iconBg: 'bg-indigo-50 text-indigo-700',
     },
     {
-      label: 'FX Variance',
-      pct: getPct(countForType('FX')),
-      icon: Globe2,
-      iconBg: 'bg-pastel-mint text-emerald-700',
-    },
-    {
-      label: 'Missing Invoice',
-      pct: getPct(countForType('MISSING') + countForType('UNMATCHED')),
-      icon: FileText,
-      iconBg: 'bg-pastel-pink text-rose-700',
-    },
-    {
-      label: 'Unclear Reference',
-      pct: getPct(countForType('REFERENCE') + countForType('FUZZY')),
-      icon: HelpCircle,
-      iconBg: 'bg-pastel-blue text-sky-700',
-    },
-    {
+      key: 'PARTIAL_PAYMENT',
       label: 'Partial Payment',
-      pct: getPct(countForType('PARTIAL')),
+      count: exceptionCounts['PARTIAL_PAYMENT'] || 0,
       icon: Split,
       iconBg: 'bg-pastel-lavender text-purple-700',
     },
     {
-      label: 'Duplicate Entry',
-      pct: getPct(countForType('DUPLICATE')),
-      icon: Copy,
-      iconBg: 'bg-indigo-50 text-indigo-700',
+      key: 'AMOUNT_VARIANCE',
+      label: 'Amount Variance',
+      count: exceptionCounts['AMOUNT_VARIANCE'] || 0,
+      icon: AlertTriangle,
+      iconBg: 'bg-amber-50 text-amber-700',
     },
+    {
+      key: 'TIMING_DIFFERENCE',
+      label: 'Timing Difference',
+      count: exceptionCounts['TIMING_DIFFERENCE'] || 0,
+      icon: Clock,
+      iconBg: 'bg-pastel-yellow text-amber-700',
+    },
+    {
+      key: 'FX_VARIANCE',
+      label: 'FX Variance',
+      count: exceptionCounts['FX_VARIANCE'] || 0,
+      icon: Globe2,
+      iconBg: 'bg-pastel-mint text-emerald-700',
+    },
+    {
+      key: 'MISSING_IN_LEDGER',
+      label: 'Missing in Ledger',
+      count: exceptionCounts['MISSING_IN_LEDGER'] || 0,
+      icon: FileText,
+      iconBg: 'bg-pastel-pink text-rose-700',
+    },
+    {
+      key: 'MISSING_IN_BANK',
+      label: 'Missing in Bank',
+      count: exceptionCounts['MISSING_IN_BANK'] || 0,
+      icon: Layers,
+      iconBg: 'bg-purple-50 text-purple-700',
+    }
   ];
 
   return (
@@ -71,11 +74,11 @@ export function ExceptionTypes({ batchData, onViewAll }) {
 
       {/* Grid of exception pills */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        {categories.map((cat, idx) => {
+        {categories.map((cat) => {
           const Icon = cat.icon;
           return (
             <div
-              key={idx}
+              key={cat.key}
               className="flex items-center justify-between p-2 rounded-xl bg-[#FAFAF8] border border-slate-100 hover:border-slate-200 transition-colors"
             >
               <div className="flex items-center space-x-2 min-w-0">
@@ -87,15 +90,16 @@ export function ExceptionTypes({ batchData, onViewAll }) {
                 </span>
               </div>
               <span className="text-xs font-mono font-bold text-ink pl-2">
-                {cat.pct}
+                {cat.count}
               </span>
             </div>
           );
         })}
       </div>
 
-      <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-400 font-mono">
-        10-category autonomous classification
+      <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-400 font-mono flex items-center justify-between">
+        <span>Authoritative Taxonomy</span>
+        <span className="font-bold text-slate-600">{totalExceptions} Total Exceptions</span>
       </div>
     </div>
   );

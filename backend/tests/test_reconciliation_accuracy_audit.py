@@ -237,7 +237,11 @@ class TestReconciliationAccuracyAudit(unittest.TestCase):
 
     def test_13_missing_bank_record_ledger_only(self):
         """Scenario 13: Missing bank record (L019-L022 exist only in ledger)"""
-        matched_ledger_ids = {r.ledger_tx_id for r in self.results if r.ledger_tx_id}
+        # Only include ledger IDs that were matched to actual bank transactions (not LEDGER_ONLY synthetic rows)
+        matched_ledger_ids = {
+            r.ledger_tx_id for r in self.results
+            if r.ledger_tx_id and r.bank_tx is not None
+        }
         ledger_only_ids = {"L019", "L020", "L021", "L022"}
         for lid in ledger_only_ids:
             self.assertNotIn(lid, matched_ledger_ids, f"Ledger {lid} should not be matched to any bank tx")

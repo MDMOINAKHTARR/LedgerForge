@@ -172,12 +172,7 @@ class MultiTierMatchingEngine:
                         "decision": ActionTaken.ESCALATE_TO_HUMAN.value
                     }
                     
-                    reasoning = (
-                        f"Duplicate bank deposit detected. Reference '{b_ref}' matches ledger record {l_cand.id} "
-                        f"({format_currency(l_cand.amount, l_cand.currency)}), but this ledger record was already "
-                        f"consumed by bank transaction {prior_b_id}. Human confirmation required to verify if this is a "
-                        f"duplicate deposit or separate unrecorded transaction."
-                    )
+                    reasoning = "Equivalent ledger record has already been consumed by another bank transaction. Automatic reconciliation stopped to prevent duplicate posting."
                     
                     res_id = f"res_{uuid.uuid4().hex[:8]}"
                     res = ReconciliationResultSchema(
@@ -400,31 +395,23 @@ class MultiTierMatchingEngine:
                     if is_partial and (pct_diff > 0.10 or "partially paid" in (l_cand.status or "").lower()):
                         match_type = MatchType.PARTIAL_PAYMENT
                         conf = 0.65
-                        remaining = round(l_cand.normalized_amount - b_tx.normalized_amount, 2)
-                        reasoning = (
-                            f"Possible match found: {b_ref} ({l_cand.counterparty or l_cand.id}). Reference matches, "
-                            f"but bank payment is {format_currency(b_tx.amount, b_tx.currency)} versus ledger amount "
-                            f"{format_currency(l_cand.amount, l_cand.currency)} (unpaid balance: {format_currency(remaining, b_tx.currency)}). "
-                            f"Classified as PARTIAL_PAYMENT. Human confirmation required."
-                        )
+                        reasoning = "Candidate ledger record exists and reference matches, but bank payment is lower than ledger amount. Possible partial payment. Human review required."
                     elif is_overpayment and pct_diff > 0.10:
                         match_type = MatchType.OVERPAYMENT
                         conf = 0.60
-                        reasoning = (
-                            f"Possible match found: {b_ref}. Bank received {format_currency(b_tx.amount, b_tx.currency)}, "
-                            f"exceeding ledger record of {format_currency(l_cand.amount, l_cand.currency)}. "
-                            f"Classified as OVERPAYMENT. Human confirmation required."
-                        )
+                        reasoning = "Candidate ledger record exists and reference matches, but bank payment is higher than ledger amount. Possible overpayment. Human review required."
                     else:
                         # Material amount variance (e.g. Lumen Labs $540 vs $550, diff = $10)
                         match_type = MatchType.AMOUNT_VARIANCE
                         conf = 0.58
-                        reasoning = (
-                            f"Possible match found: {b_ref} ({l_cand.counterparty or l_cand.id}). Reference matches, "
-                            f"but bank deposit is {format_currency(b_tx.amount, b_tx.currency)} versus ledger amount "
-                            f"{format_currency(l_cand.amount, l_cand.currency)} (material variance of {format_currency(amt_diff, b_tx.currency)}). "
-                            f"Classified as AMOUNT_VARIANCE. Human confirmation required."
-                        )
+                        amt_diff_str = f"${int(amt_diff)}" if b_tx.currency == "USD" and amt_diff.is_integer() else format_currency(amt_diff, b_tx.currency)
+                        diff = l_cand.normalized_amount - b_tx.normalized_amount
+                        if diff > 0:
+                            reasoning = f"Candidate found and reference/currency evidence matches, but amount variance detected: bank amount is {amt_diff_str} lower than ledger amount. Human review required."
+                        elif diff < 0:
+                            reasoning = f"Candidate found and reference/currency evidence matches, but amount variance detected: bank amount is {amt_diff_str} higher than ledger amount. Human review required."
+                        else:
+                            reasoning = "Candidate found, but material amount variance detected. Human review required."
                         
                     evidence_dict = {
                         "reference_match": True,
@@ -612,11 +599,7 @@ class MultiTierMatchingEngine:
                 "decision": ActionTaken.REJECT.value
             }
             
-            reasoning = (
-                f"No credible ledger candidate found for bank transaction {b_tx.id} "
-                f"({format_currency(b_tx.amount, b_tx.currency)} - '{b_tx.description}'). "
-                f"No matching reference, counterparty, or amount in ledger pool. Classified as MISSING_IN_LEDGER (UNMATCHED)."
-            )
+            reasoning = "No credible ledger candidate was found."
             
             res_id = f"res_{uuid.uuid4().hex[:8]}"
             res = ReconciliationResultSchema(
@@ -658,10 +641,7 @@ class MultiTierMatchingEngine:
         # =========================================================================
         unconsumed_ledger = [tx for tx in ledger_txs if ledger_state[tx.id] == LedgerCandidateState.AVAILABLE]
         for l_tx in unconsumed_ledger:
-            reasoning = (
-                f"Ledger transaction {l_tx.id} ({format_currency(l_tx.amount, l_tx.currency)} - '{l_tx.description}') "
-                f"has no corresponding bank statement entry. Classified as LEDGER_ONLY (MISSING_IN_BANK)."
-            )
+            reasoning = "No corresponding bank transaction was found."
             res_id = f"res_{uuid.uuid4().hex[:8]}"
             res = ReconciliationResultSchema(
                 id=res_id,

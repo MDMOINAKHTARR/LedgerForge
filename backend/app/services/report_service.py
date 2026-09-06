@@ -176,56 +176,65 @@ class CanonicalReportService:
             else:
                 amt_diff = None
             
-            # Semantic Classification based on canonical reconciliation_status
-            if is_auto and amt_diff < 0.01 and b and l and b.date == l.effective_settlement_date:
-                cat = "IDENTICAL_SOURCE_MATCH"
-                cat_label = "SAME (IDENTICAL MATCH)"
-                badge_color = "emerald"
-            elif is_auto:
-                cat = "RECONCILED_MATCH"
-                cat_label = "RECONCILED (AUTO MATCH)"
-                badge_color = "teal"
-            elif is_review:
-                cat = "REVIEW_REQUIRED"
-                cat_label = f"REVIEW ({r.match_type.value if hasattr(r.match_type, 'value') else r.match_type})"
-                badge_color = "amber"
-            elif is_ledger_only or not b:
-                cat = "LEDGER_ONLY"
-                cat_label = "LEDGER ONLY (MISSING IN BANK)"
-                badge_color = "purple"
-            else:
-                cat = "UNMATCHED"
-                cat_label = "UNMATCHED (MISSING IN LEDGER)"
-                badge_color = "rose"
+            # Primary outcome category is the authoritative canonical reconciliation_status
+            recon_status_str = r.reconciliation_status.value if hasattr(r.reconciliation_status, "value") else str(r.reconciliation_status)
+            badge_map = {
+                "AUTO_MATCHED": "emerald",
+                "HUMAN_REVIEW": "amber",
+                "UNMATCHED": "rose",
+                "LEDGER_ONLY": "purple"
+            }
+            badge_color = badge_map.get(recon_status_str, "slate")
+            cat = recon_status_str
+            cat_label = recon_status_str
+
+            # Extract counterparty and reference
+            l_counterparty = "N/A"
+            if l:
+                l_counterparty = getattr(l, "counterparty", None) or (l.raw_data.get("counterparty") if (l.raw_data and "counterparty" in l.raw_data) else None) or (l.description if l.description else "N/A")
+            
+            ref = "N/A"
+            if b and b.reference_id:
+                ref = b.reference_id
+            elif l and l.reference_id:
+                ref = l.reference_id
+
+            exc_type_str = ", ".join(r.exception_types) if r.exception_types else "NONE"
+            rec_action = r.recommended_action or ("AUTO_POST" if recon_status_str == "AUTO_MATCHED" else ("REVIEW" if recon_status_str == "HUMAN_REVIEW" else "INVESTIGATE"))
                 
             comparison_records.append({
                 "result_id": r.id,
                 "bank_id": b.id if b else "N/A",
+                "bank_transaction_id": b.id if b else "N/A",
                 "ledger_id": l.id if l else "N/A",
-                "reconciliation_status": r.reconciliation_status.value if hasattr(r.reconciliation_status, "value") else str(r.reconciliation_status),
-                "match_method": r.match_method,
-                "confidence": r.confidence,
-                "exception_types": r.exception_types,
-                "recommended_action": r.recommended_action,
+                "ledger_transaction_id": l.id if l else "N/A",
+                "reconciliation_status": recon_status_str,
+                "match_method": r.match_method or "RULE",
+                "confidence": r.confidence if r.confidence is not None else r.confidence_score,
+                "confidence_display": f"{round((r.confidence if r.confidence is not None else r.confidence_score) * 100, 1)}%" if recon_status_str in ["AUTO_MATCHED", "HUMAN_REVIEW"] else "0.0%",
+                "exception_type": exc_type_str,
+                "exception_types": r.exception_types or [],
+                "recommended_action": rec_action,
                 "category": cat,
                 "category_label": cat_label,
                 "badge_color": badge_color,
                 "bank_date": b.date if b else "N/A",
-                "bank_value_date": b.value_date if b else "N/A",
+                "bank_value_date": b.value_date if (b and b.value_date) else "N/A",
                 "bank_desc": b.description if b else "N/A",
-                "bank_amount": b_amt,
+                "bank_amount": b_amt if b else None,
                 "bank_currency": b.currency if b else None,
                 "bank_amount_formatted": format_currency(b_amt, b.currency) if b else "N/A",
-                "ledger_document_date": l.document_date if l else "N/A",
-                "ledger_posting_date": l.posting_date if l else "N/A",
+                "ledger_document_date": l.document_date if (l and l.document_date) else "N/A",
+                "ledger_posting_date": l.posting_date if (l and l.posting_date) else "N/A",
                 "ledger_date": l.effective_settlement_date if l else "N/A",
                 "ledger_desc": l.description if l else "N/A",
-                "ledger_amount": l_amt,
+                "ledger_counterparty": l_counterparty,
+                "reference": ref,
+                "ledger_amount": l_amt if l else None,
                 "ledger_currency": l.currency if l else None,
                 "ledger_amount_formatted": format_currency(l_amt, l.currency) if l else "N/A",
                 "variance": amt_diff,
                 "variance_formatted": format_currency(amt_diff, curr) if amt_diff is not None else "N/A",
-                "confidence_display": f"{round(r.confidence_score * 100, 1)}%" if not is_unmatched else "N/A",
                 "reasoning": r.explanation or r.reasoning,
                 "explanation": r.explanation or r.reasoning,
                 "relevant_dates": r.relevant_dates,
@@ -279,12 +288,16 @@ class CanonicalReportService:
             ["Currencies Detected", ", ".join(summary["currencies_detected"])],
             [""],
             ["BATCH SUMMARY"],
-            ["Bank Transactions", summary["counts"]["total_bank_transactions"]],
-            ["Ledger Entries", summary["counts"]["total_ledger_entries"]],
-            ["Auto-Reconciled", summary["counts"]["auto_matched"]],
-            ["Human Review", summary["counts"]["human_review"]],
-            ["Unmatched", summary["counts"]["unmatched"]],
-            ["Ledger-Only Entries", summary["counts"]["ledger_only"]],
+            ["Total bank transactions", summary["counts"]["total_bank_transactions"]],
+            ["Total ledger entries", summary["counts"]["total_ledger_entries"]],
+            ["Auto-matched", summary["counts"]["auto_matched"]],
+            ["Human review", summary["counts"]["human_review"]],
+            ["Bank unmatched", summary["counts"]["unmatched"]],
+            ["Ledger-only", summary["counts"]["ledger_only"]],
+            ["Auto-match rate", f"{summary['quality_metrics']['straight_through_rate']}%"],
+            ["Review rate", f"{summary['quality_metrics']['human_review_rate']}%"],
+            ["Unmatched rate", f"{summary['quality_metrics']['unmatched_rate']}%"],
+            ["Currencies detected", ", ".join(summary["currencies_detected"])],
             [""],
             ["QUALITY & SAFETY METRICS"],
             ["Auto-Match Precision", f"{summary['quality_metrics']['auto_match_precision']}%"],
@@ -304,7 +317,7 @@ class CanonicalReportService:
             rows.append([f"--- Currency: {curr} ---"])
             rows.append(["Bank Volume", data["bank_volume_formatted"]])
             rows.append(["Ledger Volume", data["ledger_volume_formatted"]])
-            rows.append(["Net Variance", data["variance_formatted"]])
+            rows.append(["Variance", data["variance_formatted"]])
             rows.append([])
             
         if not summary["cross_currency_consolidated"]:
@@ -318,26 +331,50 @@ class CanonicalReportService:
         
         rows.append(["=== TRANSACTION LEVEL RECONCILIATION OUTCOMES ==="])
         rows.append([
-            "Reconciliation Status", "Category", "Bank ID", "Bank Date", "Bank Description",
-            "Bank Amount", "Ledger ID", "Ledger Date", "Ledger Description", "Ledger Amount",
-            "Variance", "Confidence", "Reasoning"
+            "Bank Transaction ID",
+            "Ledger Transaction ID",
+            "Reconciliation Status",
+            "Match Method",
+            "Confidence",
+            "Bank Amount",
+            "Bank Currency",
+            "Ledger Amount",
+            "Ledger Currency",
+            "Variance",
+            "Exception Type",
+            "Bank Transaction Date",
+            "Bank Value Date",
+            "Ledger Document Date",
+            "Ledger Posting Date",
+            "Bank Description",
+            "Ledger Counterparty",
+            "Reference",
+            "Explanation",
+            "Recommended Action"
         ])
         
         for rec in summary["comparison_records"]:
             rows.append([
-                rec["category_label"],
-                rec["category"],
                 rec["bank_id"],
-                rec["bank_date"],
-                rec["bank_desc"],
-                rec["bank_amount_formatted"],
                 rec["ledger_id"],
-                rec["ledger_date"],
-                rec["ledger_desc"],
-                rec["ledger_amount_formatted"],
-                rec["variance_formatted"],
+                rec["reconciliation_status"],
+                rec["match_method"],
                 rec["confidence_display"],
-                rec["reasoning"]
+                rec["bank_amount_formatted"] if rec["bank_id"] != "N/A" else "N/A",
+                rec["bank_currency"] or "N/A",
+                rec["ledger_amount_formatted"] if rec["ledger_id"] != "N/A" else "N/A",
+                rec["ledger_currency"] or "N/A",
+                rec["variance_formatted"],
+                rec["exception_type"],
+                rec["bank_date"],
+                rec["bank_value_date"],
+                rec["ledger_document_date"],
+                rec["ledger_posting_date"],
+                rec["bank_desc"],
+                rec["ledger_counterparty"],
+                rec["reference"],
+                rec["explanation"],
+                rec["recommended_action"]
             ])
             
         return "\n".join([",".join([f'"{str(c).replace(chr(34), chr(34)+chr(34))}"' for c in r]) for r in rows])

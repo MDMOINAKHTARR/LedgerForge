@@ -1,107 +1,101 @@
 import React from 'react';
-import { CheckCircle2, ShieldAlert, XCircle, Activity, Gauge, Clock, DollarSign, ShieldCheck, Percent } from 'lucide-react';
+import { 
+  CheckCircle2, ShieldAlert, XCircle, Activity, Gauge, Clock, 
+  Coins, Percent, Layers, AlertCircle 
+} from 'lucide-react';
+import { getCanonicalSummary } from '../services/canonicalReport';
 
 export function DashboardStats({ batchData, activeAgentVersion }) {
   if (!batchData) return null;
 
-  const totalBank = batchData.total_bank_tx || batchData.results?.filter(r => r.reconciliation_status !== 'LEDGER_ONLY' && r.bank_tx_id && !r.bank_tx_id.startsWith('ledger_only_')).length || batchData.results?.length || 0;
-  
-  const autoCount = batchData.results
-    ? batchData.results.filter(r => r.reconciliation_status === 'AUTO_MATCHED' || r.action_taken === 'AUTO_RECONCILE').length
-    : (batchData.auto_reconciled_count || 0);
+  const summary = getCanonicalSummary(batchData);
+  if (!summary) return null;
 
-  const escCount = batchData.results
-    ? batchData.results.filter(r => r.reconciliation_status === 'HUMAN_REVIEW' || r.action_taken === 'ESCALATE_TO_HUMAN').length
-    : (batchData.escalated_count || 0);
-  
-  // Unmatched: items with no matched ledger entry or flagged/rejected
-  const unmatchedCount = batchData.results
-    ? batchData.results.filter(r => r.reconciliation_status === 'UNMATCHED' || (!r.ledger_tx_id && r.reconciliation_status !== 'LEDGER_ONLY') || r.action_taken === 'REJECT').length
-    : (batchData.rejected_count || 0);
+  const { counts, quality_metrics, currencies_detected, exception_counts } = summary;
 
-  const stpRate = totalBank > 0 ? ((autoCount / totalBank) * 100).toFixed(1) : '0.0';
-  const accuracy = activeAgentVersion?.accuracy_score
-    ? (activeAgentVersion.accuracy_score * 100).toFixed(1)
-    : '96.4';
-  
-  const falseAutoPostRate = '0.0%'; // Guardrail invariant
-  const avgLatency = activeAgentVersion?.avg_latency_ms
-    ? `${activeAgentVersion.avg_latency_ms.toFixed(1)} ms`
-    : '5.2 ms';
-
-  const unitCost = activeAgentVersion?.avg_cost_usd || 0.00004;
-  const estimatedCost = `$${(unitCost * Math.max(1, totalBank)).toFixed(4)}`;
+  const totalExceptions = Object.values(exception_counts || {}).reduce((a, b) => a + b, 0);
+  const currenciesStr = (currencies_detected || []).length > 0 
+    ? currencies_detected.join(', ') 
+    : 'None';
 
   const statCards = [
     {
-      label: 'Total Transactions',
-      value: totalBank,
+      label: 'Total Bank Transactions',
+      value: counts.total_bank_transactions.toLocaleString(),
       subtext: 'Ingested bank records',
       icon: Activity,
       color: 'text-slate-200',
       border: 'border-slate-800'
     },
     {
-      label: 'Auto-Reconciled',
-      value: `${autoCount} (${stpRate}%)`,
-      subtext: 'High-confidence automated postings',
+      label: 'Total Ledger Entries',
+      value: counts.total_ledger_entries.toLocaleString(),
+      subtext: 'Ingested company entries',
+      icon: Layers,
+      color: 'text-slate-200',
+      border: 'border-slate-800'
+    },
+    {
+      label: 'Auto-Matched',
+      value: `${counts.auto_matched} (${quality_metrics.straight_through_rate}%)`,
+      subtext: 'Straight-through reconciliations',
       icon: CheckCircle2,
       color: 'text-emerald-400',
       border: 'border-emerald-500/30 bg-emerald-500/5'
     },
     {
-      label: 'Escalated to Human',
-      value: `${escCount}`,
-      subtext: 'Ambiguous / fee exceptions requiring sign-off',
+      label: 'Human Review',
+      value: `${counts.human_review} (${quality_metrics.human_review_rate}%)`,
+      subtext: 'Ambiguity & policy exceptions',
       icon: ShieldAlert,
       color: 'text-amber-400',
       border: 'border-amber-500/30 bg-amber-500/5'
     },
     {
-      label: 'Unmatched',
-      value: `${unmatchedCount}`,
-      subtext: 'Missing invoice or unmatched',
+      label: 'Bank Unmatched',
+      value: `${counts.unmatched} (${quality_metrics.unmatched_rate}%)`,
+      subtext: 'Missing in company ledger',
       icon: XCircle,
       color: 'text-rose-400',
-      border: 'border-slate-800'
+      border: 'border-rose-500/30 bg-rose-500/5'
     },
     {
-      label: 'Benchmark Accuracy',
-      value: `${accuracy}%`,
-      subtext: 'Objective ground truth alignment',
-      icon: Gauge,
-      color: 'text-blue-400',
-      border: 'border-slate-800'
+      label: 'Ledger-Only',
+      value: `${counts.ledger_only}`,
+      subtext: 'Unpresented / missing in bank',
+      icon: AlertCircle,
+      color: 'text-purple-400',
+      border: 'border-purple-500/30 bg-purple-500/5'
     },
     {
-      label: 'STP Rate',
-      value: `${stpRate}%`,
-      subtext: 'Straight-through processing',
+      label: 'Auto-Match Rate',
+      value: `${quality_metrics.straight_through_rate}%`,
+      subtext: 'STP processing rate',
       icon: Percent,
       color: 'text-emerald-400',
       border: 'border-slate-800'
     },
     {
-      label: 'False Auto-Post Rate',
-      value: falseAutoPostRate,
-      subtext: 'Hard safety constraint: ≤ 5.0%',
-      icon: ShieldCheck,
-      color: 'text-emerald-300',
-      border: 'border-emerald-500/20'
-    },
-    {
-      label: 'Average Latency',
-      value: avgLatency,
-      subtext: 'End-to-end multi-tier pipeline',
+      label: 'Review Rate',
+      value: `${quality_metrics.human_review_rate}%`,
+      subtext: 'Escalation requirement rate',
       icon: Clock,
-      color: 'text-slate-300',
+      color: 'text-amber-400',
       border: 'border-slate-800'
     },
     {
-      label: 'Estimated Cost',
-      value: estimatedCost,
-      subtext: 'Token & API processing costs',
-      icon: DollarSign,
+      label: 'Currencies Detected',
+      value: currenciesStr,
+      subtext: 'Multi-currency scope',
+      icon: Coins,
+      color: 'text-blue-400',
+      border: 'border-slate-800'
+    },
+    {
+      label: 'Exception Counts',
+      value: `${totalExceptions}`,
+      subtext: 'Classified exception items',
+      icon: Gauge,
       color: 'text-slate-300',
       border: 'border-slate-800'
     }
@@ -111,7 +105,7 @@ export function DashboardStats({ batchData, activeAgentVersion }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-slate-400">
-          Executive Portfolio Performance Metrics
+          Canonical Reconciliation Portfolio Metrics
         </h3>
         <span className="text-[11px] font-mono text-slate-400 bg-slate-900 px-2.5 py-0.5 rounded border border-slate-800">
           Agent: {activeAgentVersion?.version_name || 'Agent V3'}

@@ -335,6 +335,7 @@ class ReconciliationBatchSchema(BaseModel):
     rejected_count: int
     status: str
     results: List[ReconciliationResultSchema] = []
+    report_summary: Optional[Dict[str, Any]] = None
 
 class AgentVersionSchema(BaseModel):
     id: str

@@ -257,6 +257,7 @@ export default function App() {
                 </div>
                 <div className="lg:col-span-3">
                   <TransactionStatusDonut
+                    batchData={batchData}
                     total={batchData?.total_bank_tx || batchData?.results?.length || 0}
                     autoPct={
                       batchData && (batchData.total_bank_tx || batchData.results?.length) > 0
@@ -304,7 +305,12 @@ export default function App() {
                   <QuickActions
                     onUploadBankFile={() => setIsCustomUploadOpen(true)}
                     onUploadLedgerFile={() => setIsCustomUploadOpen(true)}
-                    onGenerateReport={() => alert('Exporting comprehensive ledger reconciliation audit report...')}
+                    onGenerateReport={() => {
+                      if (batchData) {
+                        setLatestReportData(batchData);
+                        setShowReconciliationReport(true);
+                      }
+                    }}
                     onManageRules={() => setActiveTab('agent-evolution')}
                   />
                 </div>
@@ -460,7 +466,12 @@ export default function App() {
         onClose={() => setIsCustomUploadOpen(false)}
         onReconcileComplete={(data) => {
           setBatchData(data);
+          setHasReconciled(true);
+          setLatestReportData(data);
+          setShowReconciliationReport(true);
           setActiveTab('dashboard');
+          const excs = (data.results || []).filter(r => r.action_taken === 'ESCALATE_TO_HUMAN');
+          setPendingExceptions(excs);
         }}
         activeVersionId={selectedVersionId}
         setSelectedVersionId={setSelectedVersionId}

@@ -1,32 +1,33 @@
 import React from 'react';
-import { FileText, CheckCircle2, Clock, ShieldCheck, TrendingUp } from 'lucide-react';
+import { FileText, CheckCircle2, Clock, ShieldAlert, TrendingUp } from 'lucide-react';
+import { getCanonicalSummary } from '../services/canonicalReport';
 
 export function KpiGrid({ batchData }) {
-  const totalTx = batchData ? (batchData.total_bank_tx || batchData.results?.length || 0) : 0;
-  const autoCount = batchData ? (batchData.auto_reconciled_count || 0) : 0;
-  const reviewCount = batchData ? (batchData.escalated_count || 0) : 0;
+  const summary = getCanonicalSummary(batchData);
   
-  const stpRate = totalTx > 0 
-    ? Math.round((autoCount / totalTx) * 100) 
-    : 0;
-    
-  const reviewRate = totalTx > 0 
-    ? Math.round((reviewCount / totalTx) * 100) 
-    : 0;
+  const totalTx = summary ? summary.counts.total_bank_transactions : 0;
+  const totalLedger = summary ? summary.counts.total_ledger_entries : 0;
+  const autoCount = summary ? summary.counts.auto_matched : 0;
+  const reviewCount = summary ? summary.counts.human_review : 0;
+  const unmatchedCount = summary ? summary.counts.unmatched : 0;
+  const ledgerOnlyCount = summary ? summary.counts.ledger_only : 0;
+  
+  const stpRate = summary ? summary.quality_metrics.straight_through_rate : 0;
+  const reviewRate = summary ? summary.quality_metrics.human_review_rate : 0;
 
   const kpis = [
     {
       label: 'TOTAL TRANSACTIONS',
       value: totalTx.toLocaleString(),
-      subtext: totalTx > 0 ? 'Real ingested bank records' : 'No transactions loaded',
-      trend: totalTx > 0 ? 'Live real data' : null,
+      subtext: totalTx > 0 ? `${totalTx} bank · ${totalLedger} ledger entries` : 'No transactions loaded',
+      trend: totalTx > 0 ? 'Canonical dataset' : null,
       icon: FileText,
       bg: 'bg-pastel-mint-light/60',
       border: 'border-pastel-mint-border/60',
       iconBg: 'bg-emerald-100 text-emerald-700',
     },
     {
-      label: 'AUTO-RECONCILED',
+      label: 'AUTO-MATCHED',
       value: `${stpRate}%`,
       subtext: `${autoCount.toLocaleString()} transactions`,
       trend: null,
@@ -36,7 +37,7 @@ export function KpiGrid({ batchData }) {
       iconBg: 'bg-emerald-500 text-white',
     },
     {
-      label: 'NEEDS REVIEW',
+      label: 'HUMAN REVIEW',
       value: `${reviewRate}%`,
       subtext: `${reviewCount.toLocaleString()} transactions`,
       trend: null,
@@ -46,11 +47,11 @@ export function KpiGrid({ batchData }) {
       iconBg: 'bg-rose-500/10 text-rose-600',
     },
     {
-      label: 'AUDIT TRAIL',
-      value: '100%',
-      subtext: 'All decisions logged',
+      label: 'UNMATCHED & LEDGER-ONLY',
+      value: `${unmatchedCount + ledgerOnlyCount}`,
+      subtext: `${unmatchedCount} unmatched · ${ledgerOnlyCount} ledger-only`,
       trend: null,
-      icon: ShieldCheck,
+      icon: ShieldAlert,
       bg: 'bg-pastel-blue-light',
       border: 'border-pastel-blue-border',
       iconBg: 'bg-sky-500/10 text-sky-600',

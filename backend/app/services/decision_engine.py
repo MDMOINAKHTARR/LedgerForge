@@ -20,12 +20,19 @@ class DecisionEngine:
     @staticmethod
     def evaluate_reconciliation_result(
         result: Any,
-        policy: Optional[DecisionPolicy] = None,
+        policy: Optional[Any] = None,
         agent_version: str = "v3"
     ) -> FinalDecisionOutput:
         """
         Convenience wrapper evaluating an existing reconciliation result through decision policy checks.
         """
+        actual_policy = None
+        actual_version = agent_version
+        if isinstance(policy, str):
+            actual_version = policy
+        elif isinstance(policy, DecisionPolicy):
+            actual_policy = policy
+
         bank_tx = getattr(result, "bank_tx", None)
         ledger_tx = getattr(result, "ledger_tx", None)
         selected_ledger_id = getattr(result, "ledger_tx_id", None)
@@ -42,8 +49,8 @@ class DecisionEngine:
             evidence=evidence,
             exception_type=exception_type,
             candidate_matches=getattr(result, "candidate_matches", []) or [],
-            policy=policy,
-            agent_version_id=agent_version
+            policy=actual_policy,
+            agent_version_id=actual_version
         )
 
     @staticmethod
@@ -201,42 +208,58 @@ class DecisionEngine:
             final_decision = ActionTaken.REJECT.value
             recon_status = "UNMATCHED"
             confidence = 0.0  # Unmatched is not a low-confidence match; it has zero match confidence
-            bank_desc = bank_tx.description if bank_tx else ""
-            explanation = (
-                f"No credible ledger candidate found for bank transaction {bank_tx.id if bank_tx else ''} "
-                f"({bank_amt_str} - '{bank_desc}'). Classified as MISSING_IN_LEDGER."
-            )
+            explanation = "No credible ledger candidate was found."
         elif norm_exception in ["MISSING_IN_BANK", "LEDGER_ONLY"]:
             final_decision = ActionTaken.REJECT.value
             recon_status = "LEDGER_ONLY"
             confidence = 0.0
-            explanation = f"Ledger record {selected_ledger_id} has not cleared or appeared on bank statement."
+            explanation = "No corresponding bank transaction was found."
         else:
             final_decision = ActionTaken.ESCALATE_TO_HUMAN.value
             recon_status = "HUMAN_REVIEW"
             
-            # Formulate clear "Knows When to Stop" explanation
+            # Formulate structured explanation matching canonical audit requirements
             primary_reason = high_risk_anomalies[0] if high_risk_anomalies else (
                 f"confidence ({conf_pct}%) is below configurable policy threshold ({Math_round_pct(pol.confidence_threshold)}%)"
             )
-            
-            explanation = (
-                f"The agent identified candidate {selected_ledger_id or 'ledger entry'}, but stopped because "
-                f"{primary_reason}. Human confirmation is required."
-            )
-            
-            # Determine recommended action
-            if norm_exception == "PARTIAL_PAYMENT":
+
+            if norm_exception == "DUPLICATE":
+                explanation = "Equivalent ledger record has already been consumed by another bank transaction. Automatic reconciliation stopped to prevent duplicate posting."
+                rec_action = "Verify if bank statement contains duplicate charge/deposit or if a secondary invoice exists."
+            elif norm_exception == "PARTIAL_PAYMENT":
+                explanation = "Candidate ledger record exists and reference matches, but bank payment is lower than ledger amount. Possible partial payment. Human review required."
                 rec_action = "Confirm partial settlement and apply remaining balance to open invoice."
             elif norm_exception == "OVERPAYMENT":
+                explanation = "Candidate ledger record exists and reference matches, but bank payment is higher than ledger amount. Possible overpayment. Human review required."
                 rec_action = "Verify customer overpayment or credit note allocation with finance team."
             elif norm_exception == "AMOUNT_VARIANCE":
+                if bank_tx and ledger_tx:
+                    b_norm = bank_tx.normalized_amount
+                    l_norm = ledger_tx.normalized_amount
+                    diff = l_norm - b_norm
+                    curr_str = bank_tx.currency or ledger_tx.currency or "USD"
+                    diff_abs = abs(diff)
+                    diff_formatted = f"${int(diff_abs)}" if curr_str == "USD" and diff_abs.is_integer() else format_currency(diff_abs, curr_str)
+                    if diff > 0:
+                        explanation = f"Candidate found and reference/currency evidence matches, but amount variance detected: bank amount is {diff_formatted} lower than ledger amount. Human review required."
+                    elif diff < 0:
+                        explanation = f"Candidate found and reference/currency evidence matches, but amount variance detected: bank amount is {diff_formatted} higher than ledger amount. Human review required."
+                    else:
+                        explanation = "Candidate found, but material amount variance detected. Human review required."
+                else:
+                    explanation = "Candidate found and reference/currency evidence matches, but amount variance detected. Human review required."
                 rec_action = "Investigate bank fee deduction, discount difference, or currency conversion discrepancy."
-            elif norm_exception == "DUPLICATE":
-                rec_action = "Verify if bank statement contains duplicate charge/deposit or if a secondary invoice exists."
             elif norm_exception == "FX_VARIANCE":
+                explanation = f"Candidate found, but currency conflicts between bank ({bank_tx.currency if bank_tx else 'N/A'}) and ledger ({ledger_tx.currency if ledger_tx else 'N/A'}). Human review required."
                 rec_action = "Verify multi-currency foreign exchange conversion rate and bank charges."
+            elif norm_exception in ["TIMING_DIFFERENCE", "TIMING_MISMATCH"]:
+                explanation = "Candidate found, but transaction timing exceeds acceptable settlement window. Human review required."
+                rec_action = "Verify value date lag and posting date settlement."
             else:
+                primary_reason = high_risk_anomalies[0] if high_risk_anomalies else (
+                    f"confidence ({conf_pct}%) is below configurable policy threshold ({Math_round_pct(pol.confidence_threshold)}%)"
+                )
+                explanation = f"Candidate found, but stopped because {primary_reason}. Human review required."
                 rec_action = "Review candidate ledger details and accept or re-assign to correct document."
                 
             stop_details = {

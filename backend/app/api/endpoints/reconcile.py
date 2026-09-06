@@ -1,12 +1,12 @@
 import uuid
 import time
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Response
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from backend.app.core.database import get_db
 from backend.app.models.pydantic_models import (
-    ReconciliationBatchSchema, SourceType, ActionTaken, HumanStatus
+    ReconciliationBatchSchema, NormalizedTransaction, ReconciliationResultSchema, SourceType, ActionTaken, HumanStatus
 )
 from backend.app.models.db import DBReconciliationBatch, DBTransaction, DBReconciliationResult, DBAgentTrace
 from backend.app.services.ingestion import DataIngestionService
@@ -14,6 +14,7 @@ from backend.app.services.matching_engine import MultiTierMatchingEngine
 from backend.app.services.agent_registry import AgentRegistry
 from backend.app.services.audit_service import AuditService
 from backend.app.services.decision_engine import DecisionEngine
+from backend.app.services.report_service import CanonicalReportService
 
 router = APIRouter()
 
@@ -218,6 +219,16 @@ async def upload_and_reconcile(
         except Exception as s_err:
             pass  # Fail gracefully if tables/credentials not configured yet
         
+        # Generate authoritative canonical report summary
+        report_summary = CanonicalReportService.generate_canonical_summary(
+            batch_id=batch_id,
+            bank_txs=bank_txs,
+            ledger_txs=ledger_txs,
+            results=results,
+            agent_version_id=agent_version.id,
+            created_at=time.strftime("%Y-%m-%d %H:%M:%S")
+        )
+        
         return ReconciliationBatchSchema(
             id=batch_id,
             created_at=time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -230,7 +241,8 @@ async def upload_and_reconcile(
             escalated_count=esc_count,
             rejected_count=rej_count,
             status="completed",
-            results=results
+            results=results,
+            report_summary=report_summary
         )
         
     except Exception as e:
@@ -311,6 +323,46 @@ def get_batch(batch_id: str, db: Session = Depends(get_db)):
             "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else ""
         })
         
+    # Reconstruct NormalizedTransaction objects for report summary
+    db_all_txs = db.query(DBTransaction).filter(DBTransaction.batch_id == batch_id).all()
+    bank_norm = [
+        NormalizedTransaction(
+            id=tx.id.replace(f"{batch_id}_bank_", "").replace(f"{batch_id}_", ""),
+            source=SourceType.BANK,
+            date=tx.date,
+            amount=tx.amount,
+            normalized_amount=abs(tx.amount),
+            currency=tx.currency,
+            description=tx.description or "",
+            reference=tx.reference_id,
+            metadata=tx.raw_data or {}
+        )
+        for tx in db_all_txs if tx.source.upper() == "BANK"
+    ]
+    ledger_norm = [
+        NormalizedTransaction(
+            id=tx.id.replace(f"{batch_id}_ledger_", "").replace(f"{batch_id}_", ""),
+            source=SourceType.LEDGER,
+            date=tx.date,
+            amount=tx.amount,
+            normalized_amount=abs(tx.amount),
+            currency=tx.currency,
+            description=tx.description or "",
+            reference=tx.reference_id,
+            metadata=tx.raw_data or {}
+        )
+        for tx in db_all_txs if tx.source.upper() == "LEDGER"
+    ]
+    results_objs = [ReconciliationResultSchema(**r_dict).sync_canonical_fields() for r_dict in results_list]
+    report_summary = CanonicalReportService.generate_canonical_summary(
+        batch_id=db_batch.id,
+        bank_txs=bank_norm,
+        ledger_txs=ledger_norm,
+        results=results_objs,
+        agent_version_id=db_batch.agent_version_id,
+        created_at=db_batch.created_at.strftime("%Y-%m-%d %H:%M:%S") if db_batch.created_at else ""
+    )
+
     return ReconciliationBatchSchema(
         id=db_batch.id,
         created_at=db_batch.created_at.strftime("%Y-%m-%d %H:%M:%S") if db_batch.created_at else "",
@@ -323,6 +375,20 @@ def get_batch(batch_id: str, db: Session = Depends(get_db)):
         escalated_count=db_batch.escalated_count,
         rejected_count=db_batch.rejected_count,
         status=db_batch.status,
-        results=results_list
+        results=results_list,
+        report_summary=report_summary
+    )
+
+
+@router.get("/batches/{batch_id}/csv")
+def download_batch_csv_report(batch_id: str, db: Session = Depends(get_db)):
+    batch = get_batch(batch_id, db)
+    if not batch or not batch.report_summary:
+        raise HTTPException(status_code=404, detail="Batch report not found")
+    csv_content = CanonicalReportService.generate_csv_report(batch.report_summary)
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="audit_report_{batch_id}.csv"'}
     )
 

@@ -1,6 +1,18 @@
 import React from 'react';
+import { getCanonicalSummary } from '../services/canonicalReport';
 
-export function TransactionStatusDonut({ total = 0, autoPct = 0, reviewPct = 0, excPct = 0 }) {
+export function TransactionStatusDonut({ batchData, total = 0, autoPct = 0, reviewPct = 0, excPct = 0 }) {
+  const summary = batchData ? getCanonicalSummary(batchData) : null;
+
+  const displayTotal = summary ? summary.counts.total_bank_transactions : total;
+  const displayAutoPct = summary ? summary.quality_metrics.straight_through_rate : autoPct;
+  const displayReviewPct = summary ? summary.quality_metrics.human_review_rate : reviewPct;
+  const displayUnmatchedPct = summary ? summary.quality_metrics.unmatched_rate : excPct;
+
+  const autoCount = summary ? summary.counts.auto_matched : null;
+  const reviewCount = summary ? summary.counts.human_review : null;
+  const unmatchedCount = summary ? summary.counts.unmatched : null;
+
   // SVG Donut calculation
   const size = 150;
   const strokeWidth = 14;
@@ -8,9 +20,9 @@ export function TransactionStatusDonut({ total = 0, autoPct = 0, reviewPct = 0, 
   const circumference = 2 * Math.PI * radius;
 
   // Segment calculations
-  const autoStroke = (autoPct / 100) * circumference;
-  const reviewStroke = (reviewPct / 100) * circumference;
-  const excStroke = (excPct / 100) * circumference;
+  const autoStroke = (displayAutoPct / 100) * circumference;
+  const reviewStroke = (displayReviewPct / 100) * circumference;
+  const excStroke = (displayUnmatchedPct / 100) * circumference;
 
   return (
     <div className="forge-card p-6 flex flex-col justify-between space-y-4">
@@ -56,7 +68,7 @@ export function TransactionStatusDonut({ total = 0, autoPct = 0, reviewPct = 0, 
             strokeLinecap="round"
           />
 
-          {/* Segment 3: Exceptions (Pink) */}
+          {/* Segment 3: Unmatched (Pink/Rose) */}
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -73,10 +85,10 @@ export function TransactionStatusDonut({ total = 0, autoPct = 0, reviewPct = 0, 
         {/* Donut Center Content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
           <span className="text-xl font-bold font-sans text-ink leading-none">
-            {total.toLocaleString()}
+            {displayTotal.toLocaleString()}
           </span>
           <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mt-1">
-            Transactions
+            Bank Records
           </span>
         </div>
       </div>
@@ -86,25 +98,31 @@ export function TransactionStatusDonut({ total = 0, autoPct = 0, reviewPct = 0, 
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 text-slate-600">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span>Auto-reconciled</span>
+            <span>Auto-matched</span>
           </div>
-          <span className="font-bold text-ink">{autoPct}%</span>
+          <span className="font-bold text-ink">
+            {displayAutoPct}% {autoCount !== null && <span className="text-slate-400 font-normal">({autoCount})</span>}
+          </span>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 text-slate-600">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-            <span>Needs Review</span>
+            <span>Human Review</span>
           </div>
-          <span className="font-bold text-ink">{reviewPct}%</span>
+          <span className="font-bold text-ink">
+            {displayReviewPct}% {reviewCount !== null && <span className="text-slate-400 font-normal">({reviewCount})</span>}
+          </span>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 text-slate-600">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-            <span>Exceptions</span>
+            <span>Bank Unmatched</span>
           </div>
-          <span className="font-bold text-ink">{excPct}%</span>
+          <span className="font-bold text-ink">
+            {displayUnmatchedPct}% {unmatchedCount !== null && <span className="text-slate-400 font-normal">({unmatchedCount})</span>}
+          </span>
         </div>
       </div>
     </div>
