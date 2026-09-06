@@ -20,6 +20,7 @@ import { CustomIngestionModal } from './components/CustomIngestionModal';
 import { Footer } from './components/Footer';
 import { ReconciliationReportModal } from './components/ReconciliationReportModal';
 import { ReconciliationPolicyView } from './components/ReconciliationPolicyView';
+import { HowItWorksPage } from './components/HowItWorksPage';
 import DemoComponent from './components/ui/demo';
 
 import { 
@@ -183,11 +184,22 @@ export default function App() {
     );
   }
 
+  // IF HOW IT WORKS GUIDE VIEW IS ACTIVE
+  if (currentView === 'how-it-works') {
+    return (
+      <HowItWorksPage
+        onBack={() => setCurrentView('landing')}
+        onEnterDashboard={() => setCurrentView('dashboard')}
+      />
+    );
+  }
+
   // IF LANDING PAGE VIEW IS ACTIVE
   if (currentView === 'landing') {
     return (
       <LandingPage
         onEnterDashboard={() => setCurrentView('dashboard')}
+        onOpenHowItWorks={() => setCurrentView('how-it-works')}
       />
     );
   }

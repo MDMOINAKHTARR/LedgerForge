@@ -28,7 +28,7 @@ import {
   WorksWithYouScriptText
 } from './landing';
 
-export function LandingPage({ onEnterDashboard }) {
+export function LandingPage({ onEnterDashboard, onOpenHowItWorks }) {
   return (
     <div className="min-h-screen text-[#18181B] flex flex-col font-sans selection:bg-amber-100 selection:text-black relative overflow-x-hidden">
       
@@ -67,9 +67,13 @@ export function LandingPage({ onEnterDashboard }) {
             <span>Products</span>
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </div>
-          <a href="#how-it-works" onClick={(e) => { e.preventDefault(); onEnterDashboard(); }} className="hover:text-black transition-colors">
+          <button 
+            type="button"
+            onClick={onOpenHowItWorks} 
+            className="hover:text-black transition-colors cursor-pointer text-xs font-semibold text-slate-600 bg-transparent border-0 p-0"
+          >
             How It Works
-          </a>
+          </button>
           <a href="#security" onClick={(e) => { e.preventDefault(); onEnterDashboard(); }} className="hover:text-black transition-colors">
             Security
           </a>
@@ -129,8 +133,9 @@ export function LandingPage({ onEnterDashboard }) {
           </button>
 
           <button 
-            onClick={onEnterDashboard}
-            className="bg-white hover:bg-slate-50 text-black border border-slate-300 text-xs font-semibold py-2.5 px-5 rounded-full flex items-center space-x-2 shadow-2xs transition-all"
+            type="button"
+            onClick={onOpenHowItWorks}
+            className="bg-white hover:bg-slate-50 text-black border border-slate-300 text-xs font-semibold py-2.5 px-5 rounded-full flex items-center space-x-2 shadow-2xs transition-all cursor-pointer"
           >
             <div className="w-4 h-4 rounded-full border border-black flex items-center justify-center">
               <Play className="w-2 h-2 fill-current ml-0.5" />
