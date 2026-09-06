@@ -68,11 +68,18 @@ class CanonicalReportService:
         # Verify if any auto-matched item had material amount variance or duplicate or unallowed exception
         false_auto_matches = []
         for r in auto_matched:
-            b_amt = r.bank_tx.normalized_amount if r.bank_tx else 0.0
-            l_amt = r.ledger_tx.normalized_amount if r.ledger_tx else 0.0
-            if abs(b_amt - l_amt) > 0.05:
-                false_auto_matches.append(r)
-            elif r.match_type in [MatchType.DUPLICATE, MatchType.PARTIAL_PAYMENT, MatchType.AMOUNT_VARIANCE]:
+            b_tx = r.bank_tx
+            l_tx = r.ledger_tx
+            b_amt = b_tx.normalized_amount if b_tx else 0.0
+            l_amt = l_tx.normalized_amount if l_tx else 0.0
+            b_curr = b_tx.currency.upper() if b_tx and b_tx.currency else None
+            l_curr = l_tx.currency.upper() if l_tx and l_tx.currency else None
+            # Compare amounts only when currencies match
+            if b_curr and l_curr and b_curr == l_curr:
+                if abs(b_amt - l_amt) > 0.05:
+                    false_auto_matches.append(r)
+            # Exception‑based false‑auto‑match detection
+            if r.match_type in [MatchType.DUPLICATE, MatchType.PARTIAL_PAYMENT, MatchType.AMOUNT_VARIANCE]:
                 false_auto_matches.append(r)
                 
         false_auto_match_rate = len(false_auto_matches) / max(1, auto_count)
@@ -158,10 +165,16 @@ class CanonicalReportService:
             # is_unmatched: bank has no ledger match (NOT ledger-only records)
             is_unmatched = r.reconciliation_status in (ReconciliationStatus.UNMATCHED, ReconciliationStatus.LEDGER_ONLY)
             
-            curr = b.currency if (b and b.currency) else (l.currency if (l and l.currency) else None)
+            # Determine currencies safely and compute variance only when they match
+            b_curr = b.currency.upper() if (b and b.currency) else None
+            l_curr = l.currency.upper() if (l and l.currency) else None
+            curr = b_curr if b_curr else l_curr
             b_amt = b.amount if b else 0.0
             l_amt = l.amount if l else 0.0
-            amt_diff = abs(b.normalized_amount - l.normalized_amount) if (b and l) else abs(b_amt or l_amt)
+            if b_curr and l_curr and b_curr == l_curr:
+                amt_diff = abs(b.normalized_amount - l.normalized_amount) if (b and l) else abs(b_amt - l_amt)
+            else:
+                amt_diff = None
             
             # Semantic Classification based on canonical reconciliation_status
             if is_auto and amt_diff < 0.01 and b and l and b.date == l.effective_settlement_date:
@@ -198,17 +211,20 @@ class CanonicalReportService:
                 "category_label": cat_label,
                 "badge_color": badge_color,
                 "bank_date": b.date if b else "N/A",
+                "bank_value_date": b.value_date if b else "N/A",
                 "bank_desc": b.description if b else "N/A",
                 "bank_amount": b_amt,
                 "bank_currency": b.currency if b else None,
                 "bank_amount_formatted": format_currency(b_amt, b.currency) if b else "N/A",
+                "ledger_document_date": l.document_date if l else "N/A",
+                "ledger_posting_date": l.posting_date if l else "N/A",
                 "ledger_date": l.effective_settlement_date if l else "N/A",
                 "ledger_desc": l.description if l else "N/A",
                 "ledger_amount": l_amt,
                 "ledger_currency": l.currency if l else None,
                 "ledger_amount_formatted": format_currency(l_amt, l.currency) if l else "N/A",
                 "variance": amt_diff,
-                "variance_formatted": format_currency(amt_diff, curr),
+                "variance_formatted": format_currency(amt_diff, curr) if amt_diff is not None else "N/A",
                 "confidence_display": f"{round(r.confidence_score * 100, 1)}%" if not is_unmatched else "N/A",
                 "reasoning": r.explanation or r.reasoning,
                 "explanation": r.explanation or r.reasoning,
