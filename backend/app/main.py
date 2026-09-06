@@ -23,8 +23,12 @@ else:
 from backend.app.core.database import Base, engine
 from backend.app.api.router import api_router
 
-# Initialize SQLite database tables
-Base.metadata.create_all(bind=engine)
+# Initialize database tables safely
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    import logging
+    logging.warning(f"Could not initialize tables at startup: {e}")
 
 app = FastAPI(
     title="LedgerMind - Autonomous Bank Reconciliation Agent API",
@@ -58,6 +62,7 @@ else:
     )
 
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/v1")
 
 @app.get("/")
 def root():

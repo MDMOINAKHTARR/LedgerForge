@@ -11,7 +11,23 @@ if env_path.exists():
 else:
     load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ledgermind.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Safe fallback for serverless environments (Vercel, AWS Lambda) where root is read-only
+is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+
+if not DATABASE_URL:
+    if is_serverless:
+        DATABASE_URL = "sqlite:////tmp/ledgermind.db"
+    else:
+        DATABASE_URL = "sqlite:///./ledgermind.db"
+else:
+    # If using Supabase / PostgreSQL URI, fix postgres:// -> postgresql://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    # If SQLite URL specified on Vercel points to relative path, redirect to /tmp
+    elif is_serverless and DATABASE_URL.startswith("sqlite:///./"):
+        DATABASE_URL = "sqlite:////tmp/ledgermind.db"
 
 engine = create_engine(
     DATABASE_URL, 

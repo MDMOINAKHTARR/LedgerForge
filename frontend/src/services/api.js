@@ -2,6 +2,20 @@ export const API_BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, '')}/api/v1`
   : '/api/v1';
 
+async function parseResponseError(res, fallbackMessage = 'Request failed') {
+  try {
+    const error = await res.json();
+    return error.detail || error.message || (typeof error === 'string' ? error : fallbackMessage);
+  } catch {
+    try {
+      const text = await res.text();
+      return text || `${fallbackMessage} (Status: ${res.status})`;
+    } catch {
+      return `${fallbackMessage} (Status: ${res.status})`;
+    }
+  }
+}
+
 export const uploadAndReconcile = async (bankFile, ledgerFile, agentVersionId = 'v3') => {
   const formData = new FormData();
   formData.append('bank_file', bankFile);
@@ -14,28 +28,38 @@ export const uploadAndReconcile = async (bankFile, ledgerFile, agentVersionId = 
   });
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.detail || 'Failed to process reconciliation upload');
+    const errMsg = await parseResponseError(res, 'Failed to process reconciliation upload');
+    throw new Error(errMsg);
   }
   return res.json();
 };
 
 export const getBatchDetails = async (batchId) => {
   const res = await fetch(`${API_BASE}/reconcile/batches/${batchId}`);
-  if (!res.ok) throw new Error('Failed to fetch batch details');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch batch details');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
 export const getLatestBatch = async () => {
-  const res = await fetch(`${API_BASE}/reconcile/latest`);
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/reconcile/latest`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 };
 
 export const getPendingExceptions = async (batchId = '') => {
   const url = batchId ? `${API_BASE}/exceptions/pending?batch_id=${batchId}` : `${API_BASE}/exceptions/pending`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to fetch pending exceptions');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch pending exceptions');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
@@ -48,50 +72,75 @@ export const recordHumanAction = async (resultId, action, notes = '', correctedL
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error('Failed to record human action');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to record human action');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
 export const getExceptionCandidates = async (resultId) => {
   const res = await fetch(`${API_BASE}/exceptions/${resultId}/candidates`);
-  if (!res.ok) throw new Error('Failed to fetch exception candidates');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch exception candidates');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
 export const getExceptionMemory = async (resultId) => {
-  const res = await fetch(`${API_BASE}/exceptions/${resultId}/memory`);
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/exceptions/${resultId}/memory`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 };
 
 export const getAgentVersions = async () => {
   const res = await fetch(`${API_BASE}/agents/versions`);
-  if (!res.ok) throw new Error('Failed to fetch agent versions');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch agent versions');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
 export const getActivePolicy = async (versionId = '') => {
   const url = versionId ? `${API_BASE}/agents/active-policy?version_id=${versionId}` : `${API_BASE}/agents/active-policy`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to fetch active reconciliation policy');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch active reconciliation policy');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
 export const getLeaderboard = async () => {
   const res = await fetch(`${API_BASE}/agent-engineer/leaderboard`);
-  if (!res.ok) throw new Error('Failed to fetch leaderboard');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch leaderboard');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
 export const getReconciliationTrace = async (reconciliationId) => {
   const res = await fetch(`${API_BASE}/reconciliation/${reconciliationId}/trace`);
-  if (!res.ok) throw new Error('Failed to fetch audit trace');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch audit trace');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
 export const getAuditTrail = async () => {
   const res = await fetch(`${API_BASE}/audit`);
-  if (!res.ok) throw new Error('Failed to fetch audit trail');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch audit trail');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
@@ -105,13 +154,19 @@ export const triggerAgentOptimization = async (goal = 'Maximize accuracy and STP
       dataset_seed: datasetSeed,
     }),
   });
-  if (!res.ok) throw new Error('Failed to run autonomous optimization cycle');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to run autonomous optimization cycle');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
 export const getOptimizationRuns = async () => {
   const res = await fetch(`${API_BASE}/agent-engineer/runs`);
-  if (!res.ok) throw new Error('Failed to fetch optimization runs');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch optimization runs');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
@@ -119,7 +174,10 @@ export const activateAgentVersion = async (versionId) => {
   const res = await fetch(`${API_BASE}/agent-engineer/activate/${versionId}`, {
     method: 'POST',
   });
-  if (!res.ok) throw new Error('Failed to activate agent version');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to activate agent version');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
@@ -132,13 +190,19 @@ export const runAutopsy = async (agentVersionId = 'v1', datasetSeed = 42) => {
       dataset_seed: datasetSeed,
     }),
   });
-  if (!res.ok) throw new Error('Failed to run agent autopsy');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to run agent autopsy');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
 export const getAutopsyReports = async () => {
   const res = await fetch(`${API_BASE}/autopsy/reports`);
-  if (!res.ok) throw new Error('Failed to fetch autopsy reports');
+  if (!res.ok) {
+    const errMsg = await parseResponseError(res, 'Failed to fetch autopsy reports');
+    throw new Error(errMsg);
+  }
   return res.json();
 };
 
@@ -155,8 +219,8 @@ export const runReconciliationPipeline = async (agentVersionId = 'v1', datasetSe
     }),
   });
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.detail || 'Failed to execute reconciliation pipeline');
+    const errMsg = await parseResponseError(res, 'Failed to execute reconciliation pipeline');
+    throw new Error(errMsg);
   }
   return res.json();
 };
@@ -172,8 +236,8 @@ export const improveAgentPipeline = async (baseVersionId = 'v1', goal = 'Maximiz
     }),
   });
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.detail || 'Failed to execute agent improvement loop');
+    const errMsg = await parseResponseError(res, 'Failed to execute agent improvement loop');
+    throw new Error(errMsg);
   }
   return res.json();
 };
@@ -188,9 +252,8 @@ export const runFullPipelineDemo = async (baseVersionId = 'v1', datasetSeed = 42
     }),
   });
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.detail || 'Failed to execute full pipeline demo');
+    const errMsg = await parseResponseError(res, 'Failed to execute full pipeline demo');
+    throw new Error(errMsg);
   }
   return res.json();
 };
-
