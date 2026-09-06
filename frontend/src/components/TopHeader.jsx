@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Bell, ChevronDown, ArrowLeft, Home, 
   Check, CheckCheck, Trash2, X, AlertTriangle, 
