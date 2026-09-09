@@ -21,82 +21,23 @@ export function TopHeader({
   const [filter, setFilter] = useState('all'); // 'all', 'unread', 'alerts'
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const dropdownRef = useRef(null);
 
-  const DEFAULT_ALERTS = [
-    {
-      id: 'astryx-alert-1',
-      title: 'Deployment complete',
-      message: 'Version 3.2.0 is now live in production.',
-      time: 'Just now',
-      type: 'success',
-      unread: true,
-      actionLabel: 'View Status',
-      targetTab: 'dashboard'
-    },
-    {
-      id: 'astryx-alert-2',
-      title: 'Scheduled maintenance tonight',
-      message: 'The system will be briefly unavailable from 2:00–3:00 AM.',
-      time: 'Tonight',
-      type: 'alert',
-      unread: true
-    },
-    {
-      id: 'astryx-alert-3',
-      title: 'New feature available',
-      message: 'Try the new dashboard layout in Settings.',
-      time: '1h ago',
-      type: 'info',
-      unread: false,
-      actionLabel: 'Try Layout',
-      targetTab: 'dashboard'
-    }
-  ];
 
-  // Fetch real-time dynamic notifications from live backend
+  // Fetch real-time dynamic notifications from live backend — no hardcoded fallbacks
   const fetchLiveNotifications = async () => {
     try {
       setIsLoading(true);
+      setFetchError(false);
       const data = await getNotifications();
-      if (Array.isArray(data) && data.length > 0) {
-        setNotifications(data);
-      } else if (pendingExceptionsCount > 0) {
-        setNotifications([
-          {
-            id: `live-exc-${pendingExceptionsCount}`,
-            title: `${pendingExceptionsCount} Pending Human Exception${pendingExceptionsCount > 1 ? 's' : ''}`,
-            message: `${pendingExceptionsCount} transaction${pendingExceptionsCount > 1 ? 's require' : ' requires'} human sign-off due to material variance or ambiguity.`,
-            time: 'Active',
-            type: 'alert',
-            unread: true,
-            actionLabel: 'Review Exceptions',
-            targetTab: 'exceptions'
-          },
-          ...DEFAULT_ALERTS
-        ]);
-      } else {
-        setNotifications(DEFAULT_ALERTS);
-      }
+      // Backend already merges exceptions, batches & audit logs — just use what it returns
+      setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.warn('Could not fetch dynamic notifications, using defaults:', err);
-      if (pendingExceptionsCount > 0) {
-        setNotifications([
-          {
-            id: `live-exc-${pendingExceptionsCount}`,
-            title: `${pendingExceptionsCount} Pending Human Exception${pendingExceptionsCount > 1 ? 's' : ''}`,
-            message: `${pendingExceptionsCount} transaction${pendingExceptionsCount > 1 ? 's require' : ' requires'} human sign-off due to material variance or ambiguity.`,
-            time: 'Active',
-            type: 'alert',
-            unread: true,
-            actionLabel: 'Review Exceptions',
-            targetTab: 'exceptions'
-          },
-          ...DEFAULT_ALERTS
-        ]);
-      } else {
-        setNotifications(DEFAULT_ALERTS);
-      }
+      console.warn('Could not reach notification endpoint:', err);
+      setFetchError(true);
+      // Do NOT fall back to fake data — keep whatever was previously loaded
+      // so the panel doesn't flash stale hardcoded content
     } finally {
       setIsLoading(false);
     }
@@ -335,11 +276,29 @@ export function TopHeader({
               <div className="astryx-notif-menu max-h-[420px] overflow-y-auto p-3.5 bg-slate-50/50">
                 {filteredNotifications.length === 0 ? (
                   <div className="p-8 text-center bg-white rounded-xl border border-slate-100">
-                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2.5 border border-emerald-100">
-                      <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                    <div className="text-xs font-bold text-slate-800">No notifications</div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">You're all caught up with your reconciliation alerts.</p>
+                    {fetchError ? (
+                      <>
+                        <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-2.5 border border-amber-100">
+                          <AlertTriangle className="w-5 h-5" />
+                        </div>
+                        <div className="text-xs font-bold text-slate-800">Backend unreachable</div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Could not connect to the notification service. Check that the backend is running.</p>
+                        <button
+                          onClick={fetchLiveNotifications}
+                          className="mt-3 text-[11px] font-semibold text-blue-600 hover:underline"
+                        >
+                          Retry
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2.5 border border-emerald-100">
+                          <CheckCircle2 className="w-5 h-5" />
+                        </div>
+                        <div className="text-xs font-bold text-slate-800">No notifications yet</div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">Notifications will appear here after your first reconciliation run.</p>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <Theme theme={neutralTheme}>
