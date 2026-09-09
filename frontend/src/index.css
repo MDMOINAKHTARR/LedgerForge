@@ -410,6 +410,13 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   color: #0f172a !important;
 }
 
+/* Global Custom Cursor Support */
+.custom-cursor-none,
+.custom-cursor-none * {
+  cursor: none !important;
+}
+
+
 
 
 

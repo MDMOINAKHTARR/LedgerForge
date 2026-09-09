@@ -4,6 +4,7 @@ import '@astryxdesign/core/astryx.css';
 import '@astryxdesign/theme-neutral/theme.css';
 import App from './App.jsx';
 import './index.css';
+import { SmartCursor } from './components/ui/SmartCursor';
 
 // Global runtime safety: ensure React.use is defined and expose React hooks globally
 if (!React.use) {
@@ -81,8 +82,9 @@ class ErrorBoundary extends React.Component {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
+      {/* Smart context-aware cursor — shows different labels per hovered element */}
+      <SmartCursor />
       <App />
     </ErrorBoundary>
   </React.StrictMode>
 );
-
