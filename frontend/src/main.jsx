@@ -1,12 +1,23 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import '@astryxdesign/core/astryx.css';
+import '@astryxdesign/theme-neutral/theme.css';
 import App from './App.jsx';
 import './index.css';
 
-// Global runtime safety: expose React and core hooks on window/globalThis
-// so that any asynchronous chunk, subcomponent, or browser evaluation has useState in scope.
+// Global runtime safety: ensure React.use is defined and expose React hooks globally
+if (!React.use) {
+  React.use = function(usable) {
+    if (usable && typeof usable === 'object') {
+      return React.useContext(usable);
+    }
+    return React.useContext(usable);
+  };
+}
+
 if (typeof window !== 'undefined') {
   window.React = React;
+  window.use = React.use;
   window.useState = React.useState;
   window.useEffect = React.useEffect;
   window.useMemo = React.useMemo;
@@ -15,6 +26,7 @@ if (typeof window !== 'undefined') {
 }
 if (typeof globalThis !== 'undefined') {
   globalThis.React = React;
+  globalThis.use = React.use;
   globalThis.useState = React.useState;
   globalThis.useEffect = React.useEffect;
   globalThis.useMemo = React.useMemo;

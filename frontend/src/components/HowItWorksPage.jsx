@@ -3,11 +3,16 @@ import {
   ArrowLeft, ArrowRight, ShieldCheck, Zap, Bot, Database,
   FileSpreadsheet, CheckCircle2, AlertTriangle, XCircle,
   HelpCircle, ChevronRight, Layers, Lock, Cpu, Eye,
-  RefreshCw, Scale, Users, FileText, Sparkles, ExternalLink
+  RefreshCw, Scale, Users, FileText, Sparkles, ExternalLink, Play
 } from 'lucide-react';
+import { MarketingNavbar } from './MarketingNavbar';
+import { MarketingFooter } from './MarketingFooter';
+import { VideoModal } from './VideoModal';
+import { PinkGradientBackground } from './ui/favorites';
 
-export function HowItWorksPage({ onBack, onEnterDashboard }) {
+export function HowItWorksPage({ onBack, onEnterDashboard, onNavigate }) {
   const [activeStage, setActiveStage] = useState(0);
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
 
   const stages = [
     {
@@ -183,41 +188,22 @@ if (evaluation.accuracy > baseline.accuracy && evaluation.false_auto_post_rate =
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8] text-[#18181B] font-sans antialiased selection:bg-amber-100 selection:text-black">
+    <div className="min-h-screen text-[#18181B] font-sans antialiased selection:bg-rose-100 selection:text-black relative overflow-x-hidden">
       
-      {/* 1. TOP STICKY NAVIGATION BAR */}
-      <header className="sticky top-0 z-50 bg-[#FAFAF8]/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <button 
-            onClick={onBack}
-            className="flex items-center space-x-1.5 text-xs font-semibold text-slate-600 hover:text-black transition-colors px-2 py-1 rounded-md hover:bg-slate-100"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Home</span>
-          </button>
-          
-          <div className="h-4 w-px bg-slate-300 hidden sm:block" />
+      {/* 21st.dev Favorites Live Gradient Background — Pinkish Tone */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <PinkGradientBackground className="w-full h-full" />
+      </div>
 
-          <div className="flex items-center space-x-2.5">
-            <div className="w-6 h-6 rounded-md bg-black flex items-center justify-center text-white font-bold text-xs">
-              LF
-            </div>
-            <span className="font-bold text-sm tracking-tight text-black">
-              LedgerForge Architecture Guide
-            </span>
-          </div>
-        </div>
+      {/* Shared Marketing Navbar */}
+      <MarketingNavbar 
+        activePage="how-it-works"
+        onNavigate={onNavigate}
+        onEnterDashboard={onEnterDashboard}
+      />
 
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onEnterDashboard}
-            className="bg-black hover:bg-zinc-800 text-white font-semibold text-xs py-2 px-5 rounded-full shadow-xs hover:shadow transition-all flex items-center space-x-2"
-          >
-            <span>Launch Dashboard</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </header>
+      {/* Main Page Content */}
+      <main className="relative z-10">
 
       {/* 2. HERO HEADER */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 pt-12 pb-8 text-center">
@@ -266,9 +252,22 @@ if (evaluation.accuracy > baseline.accuracy && evaluation.false_auto_post_rate =
                 7-Stage Closed-Loop Control Architecture
               </h2>
             </div>
-            <div className="flex items-center space-x-2 text-xs font-medium text-slate-500">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Deterministic Gate + Advisory Intelligence</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsVideoOpen(true)}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-2xs hover:shadow-xs text-xs font-semibold transition-all cursor-pointer group"
+              >
+                <div className="w-3.5 h-3.5 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 transition-colors">
+                  <Play className="w-1.5 h-1.5 fill-current ml-0.5" />
+                </div>
+                <span>Watch Video Walkthrough</span>
+              </button>
+
+              <div className="hidden sm:flex items-center space-x-2 text-xs font-medium text-slate-500">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Deterministic Gate + Advisory Intelligence</span>
+              </div>
             </div>
           </div>
 
@@ -302,21 +301,22 @@ if (evaluation.accuracy > baseline.accuracy && evaluation.false_auto_post_rate =
         </div>
 
         {/* Stage Selector Pills */}
-        <div className="flex items-center space-x-2 overflow-x-auto pb-4 justify-start sm:justify-center no-scrollbar">
+        <div className="flex flex-wrap items-center justify-center gap-2 pb-6">
           {stages.map((stage, idx) => {
             const Icon = stage.icon;
             const isActive = activeStage === idx;
             return (
               <button
                 key={stage.id}
+                type="button"
                 onClick={() => setActiveStage(idx)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center space-x-2 whitespace-nowrap transition-all border shrink-0 ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all border cursor-pointer ${
                   isActive 
-                    ? 'bg-black text-white border-black shadow-xs' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-black'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs' 
+                    : 'bg-white/90 text-slate-700 border-slate-200/90 hover:border-slate-300 hover:text-black hover:bg-white shadow-2xs'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
                 <span>{stage.badge}: {stage.title.split(' ')[0]} {stage.title.split(' ')[1]}</span>
               </button>
             );
@@ -518,38 +518,114 @@ if (evaluation.accuracy > baseline.accuracy && evaluation.false_auto_post_rate =
       </section>
 
       {/* 6. CALL TO ACTION & GET STARTED */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-16 text-center">
-        <div className="forge-card p-8 sm:p-12 bg-black text-white border-0 shadow-lg rounded-3xl space-y-6">
-          <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center mx-auto text-amber-400">
-            <Zap className="w-5 h-5 fill-current" />
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-5">
+        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-white/85 backdrop-blur-xl border border-white/90 shadow-[0_12px_32px_-10px_rgba(244,90,140,0.12)] px-5 sm:px-8 py-3.5 sm:py-4 text-center space-y-2 sm:space-y-2.5">
+          {/* Subtle luminous ambient highlight */}
+          <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-80 h-28 bg-gradient-to-b from-rose-200/50 to-transparent blur-2xl pointer-events-none rounded-full" />
+
+          <div className="relative z-10 space-y-1 max-w-xl mx-auto">
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200/80 text-[10px] font-mono font-semibold tracking-wider text-rose-800 uppercase shadow-2xs">
+              <Sparkles className="w-3 h-3 text-rose-600" />
+              <span>Interactive Architecture Sandbox</span>
+            </div>
+
+            <h2 className="editorial-headline text-xl sm:text-2xl font-[550] text-slate-950 tracking-tight leading-snug">
+              See the Architecture in Action
+            </h2>
+
+            <p className="text-xs sm:text-[13px] text-slate-600 leading-normal font-sans max-w-lg mx-auto">
+              Launch the LedgerForge interactive dashboard to test live multi-currency statements, inspect the audit trail, or review real exception drawer resolution flows.
+            </p>
           </div>
 
-          <h2 className="text-2xl sm:text-4xl font-bold tracking-tight">
-            See the Architecture in Action
-          </h2>
+          {/* 3 Executive Architecture Capabilities */}
+          <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2 text-left max-w-2xl mx-auto">
+            <div className="p-2 rounded-xl bg-white/70 border border-slate-200/70 shadow-2xs space-y-0.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 font-sans">
+                <div className="w-3.5 h-3.5 rounded bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200/60 shrink-0">
+                  <CheckCircle2 className="w-2.5 h-2.5" />
+                </div>
+                <span className="truncate">Deterministic Rules</span>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-tight">
+                Zero hallucination. $0.00 exact delta matching handles high-volume clearing.
+              </p>
+            </div>
 
-          <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
-            Launch the LedgerForge interactive dashboard to test live multi-currency statements, inspect the audit trail, or review real exception drawer resolution flows.
-          </p>
+            <div className="p-2 rounded-xl bg-white/70 border border-slate-200/70 shadow-2xs space-y-0.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 font-sans">
+                <div className="w-3.5 h-3.5 rounded bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200/60 shrink-0">
+                  <ShieldCheck className="w-2.5 h-2.5" />
+                </div>
+                <span className="truncate">CFO Safety Bounds</span>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-tight">
+                Material variances, anomalies, and FX pairs require human approval.
+              </p>
+            </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2">
+            <div className="p-2 rounded-xl bg-white/70 border border-slate-200/70 shadow-2xs space-y-0.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 font-sans">
+                <div className="w-3.5 h-3.5 rounded bg-purple-50 text-purple-700 flex items-center justify-center border border-purple-200/60 shrink-0">
+                  <Lock className="w-2.5 h-2.5" />
+                </div>
+                <span className="truncate">Cryptographic Lineage</span>
+              </div>
+              <p className="text-[10px] text-slate-500 leading-tight">
+                SHA-256 decision envelopes with immutable logs for audit reviews.
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-center gap-2 pt-0.5">
             <button
+              type="button"
               onClick={onEnterDashboard}
-              className="w-full sm:w-auto bg-white hover:bg-slate-100 text-black font-bold text-xs py-3 px-7 rounded-full shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+              className="w-full sm:w-auto bg-slate-950 hover:bg-black text-white font-semibold text-xs py-2 px-5 rounded-full shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 cursor-pointer group"
             >
               <span>Start Live Reconciliation</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
             </button>
 
             <button
+              type="button"
               onClick={onBack}
-              className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white font-semibold text-xs py-3 px-6 rounded-full border border-white/20 transition-all"
+              className="w-full sm:w-auto bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/90 font-semibold text-xs py-2 px-4.5 rounded-full transition-all cursor-pointer shadow-2xs hover:shadow-xs"
             >
               <span>Return to Landing Page</span>
             </button>
           </div>
+
+          {/* Security & Audit Assurance Seal */}
+          <div className="relative z-10 pt-1.5 border-t border-slate-100 flex flex-wrap items-center justify-center gap-3 text-[10px] font-mono text-slate-400">
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              In-Memory Evaluation
+            </span>
+            <span>•</span>
+            <span>Zero Hallucination Auto-Posting</span>
+            <span>•</span>
+            <span>Client-Side Data Isolation</span>
+          </div>
         </div>
       </section>
+      </main>
+
+      {/* Shared Marketing Footer */}
+      <MarketingFooter 
+        onNavigate={onNavigate} 
+        onEnterDashboard={onEnterDashboard} 
+      />
+
+      {/* Product Walkthrough Video Modal */}
+      <VideoModal
+        isOpen={isVideoOpen}
+        onClose={() => setIsVideoOpen(false)}
+        videoId="G-fjDaS-v9s"
+        title="LedgerForge | Architecture Walkthrough & Live Demonstration"
+        onEnterDashboard={onEnterDashboard}
+      />
 
     </div>
   );

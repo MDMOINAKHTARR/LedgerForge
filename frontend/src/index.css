@@ -3,6 +3,29 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
   body {
     background-color: #FAFAF8;
     color: #18181B;
@@ -101,3 +124,292 @@
   background-color: #F4F4F5;
   border-color: #A1A1AA;
 }
+
+/* Tier-1 Fintech Craft Enhancements */
+.fintech-card {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 
+    0 1px 3px 0 rgba(15, 23, 42, 0.03), 
+    0 1px 2px -1px rgba(15, 23, 42, 0.02),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fintech-card-hover:hover {
+  border-color: rgba(203, 213, 225, 0.95);
+  box-shadow: 
+    0 4px 16px -2px rgba(15, 23, 42, 0.06), 
+    0 2px 6px -1px rgba(15, 23, 42, 0.03),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
+  transform: translateY(-1px);
+}
+
+.telemetry-chip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  color: #475569;
+}
+
+/* Advanced FinTech Aesthetics & Pipeline Utilities */
+.fintech-card-glow {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  box-shadow: 
+    0 1px 3px 0 rgba(15, 23, 42, 0.04), 
+    0 8px 24px -4px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fintech-card-dark {
+  background: linear-gradient(180deg, #131722 0%, #0A0D14 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 20px 40px -15px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+}
+
+.pipeline-node-active {
+  background: #0F172A;
+  color: #FFFFFF;
+  border-color: #0F172A;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.12);
+}
+
+/* Custom FinTech Range Slider - Clean Institutional Minimalist */
+input[type="range"].fintech-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  background: #E2E8F0;
+  border-radius: 9999px;
+  outline: none;
+}
+
+input[type="range"].fintech-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #0F172A;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  background: #000000;
+}
+
+/* Astryx Design System Keyframe Animations */
+@keyframes x188b6p3-B {
+  from {
+    color: inherit;
+  }
+  to {
+    color: transparent;
+  }
+}
+
+@keyframes x13kz0yu-B {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+@keyframes x18re5ia-B {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes xgnty7z-B {
+  0% {
+    opacity: .25;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes xtut5q7-B {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes x1k48ry3-B {
+  from {
+    opacity: 0;
+    transform: scale(.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes x11lauxq-B {
+  from {
+    opacity: 0;
+    transform: translate(var(--dialog-dir-x,0px),var(--dialog-dir-y,16px)) scale(.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0,0) scale(1);
+  }
+}
+
+@keyframes xu7jd1z-B {
+  from {
+    opacity: 0;
+    transform: translateX(var(--spacing-2)) scale(.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes xwmkjkf-B {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--spacing-2))) scale(.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes x1ahk7ht-B {
+  from {
+    opacity: 0;
+    transform: translateY(var(--spacing-2)) scale(.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes xv1hr86-B {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--spacing-2))) scale(.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes x1b6yrix-B {
+  from {
+    opacity: 0;
+    transform: translateY(var(--spacing-2));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes xiylxmw-B {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--spacing-2)));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes xqng64z-B {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes xr3m334-B {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+/* Astryx Notification Menu Darker Text Styling */
+.astryx-notif-menu {
+  color: #090d16;
+}
+.astryx-notif-menu [data-astryx-theme] {
+  --color-text-primary: #020617 !important;
+  --color-text-secondary: #0f172a !important;
+  --color-text-tertiary: #1e293b !important;
+  --color-text-blue: #0f274a !important;
+  --color-text-green: #063c20 !important;
+  --color-text-yellow: #4d2600 !important;
+  --color-text-orange: #541c00 !important;
+  --color-text-red: #5c0a0a !important;
+  --color-text-gray: #0f172a !important;
+  color: #020617 !important;
+}
+.astryx-notif-menu [data-astryx-component="banner"],
+.astryx-notif-menu [data-astryx-component="banner"] * {
+  --color-text-blue: #0f274a !important;
+  --color-text-green: #063c20 !important;
+  --color-text-yellow: #4d2600 !important;
+  --color-text-orange: #541c00 !important;
+  --color-text-red: #5c0a0a !important;
+  --color-text-gray: #0f172a !important;
+}
+.astryx-notif-menu [class*="banner"] h1,
+.astryx-notif-menu [class*="banner"] h2,
+.astryx-notif-menu [class*="banner"] h3,
+.astryx-notif-menu [class*="banner"] h4,
+.astryx-notif-menu [class*="banner"] [role="heading"],
+.astryx-notif-menu [class*="banner-title"] {
+  color: #020617 !important;
+  font-weight: 700 !important;
+}
+.astryx-notif-menu [class*="banner"] p,
+.astryx-notif-menu [class*="banner-description"] {
+  color: #0f172a !important;
+}
+
+
+
+

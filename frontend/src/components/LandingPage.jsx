@@ -27,8 +27,13 @@ import {
   AuditTrailCard,
   WorksWithYouScriptText
 } from './landing';
+import { MarketingNavbar } from './MarketingNavbar';
+import { MarketingFooter } from './MarketingFooter';
+import { VideoModal } from './VideoModal';
 
-export function LandingPage({ onEnterDashboard, onOpenHowItWorks }) {
+export function LandingPage({ onEnterDashboard, onOpenHowItWorks, onNavigate }) {
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+
   return (
     <div className="min-h-screen text-[#18181B] flex flex-col font-sans selection:bg-amber-100 selection:text-black relative overflow-x-hidden">
       
@@ -40,67 +45,12 @@ export function LandingPage({ onEnterDashboard, onOpenHowItWorks }) {
         }}
       />
 
-      {/* 1. TOP NAVBAR */}
-      <header className="w-full max-w-[1240px] mx-auto px-6 h-18 py-4 flex items-center justify-between z-20 shrink-0">
-        {/* Brand Logo */}
-        <div className="flex items-center space-x-3 cursor-pointer" onClick={onEnterDashboard}>
-          <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center text-white shadow-xs">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.8"/>
-              <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" opacity="0.6"/>
-            </svg>
-          </div>
-          <div>
-            <div className="font-sans font-bold text-lg text-black tracking-tight leading-none">
-              Ledger Forge
-            </div>
-            <p className="text-[8px] font-mono tracking-widest text-slate-400 uppercase mt-0.5 font-semibold">
-              RECONCILE WITH CONFIDENCE
-            </p>
-          </div>
-        </div>
-
-        {/* Center Nav Links */}
-        <nav className="hidden md:flex items-center space-x-7 text-xs font-semibold text-slate-600">
-          <div className="flex items-center space-x-1 cursor-pointer hover:text-black transition-colors">
-            <span>Products</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
-          </div>
-          <button 
-            type="button"
-            onClick={onOpenHowItWorks} 
-            className="hover:text-black transition-colors cursor-pointer text-xs font-semibold text-slate-600 bg-transparent border-0 p-0"
-          >
-            How It Works
-          </button>
-          <a href="#security" onClick={(e) => { e.preventDefault(); onEnterDashboard(); }} className="hover:text-black transition-colors">
-            Security
-          </a>
-          <a href="#resources" onClick={(e) => { e.preventDefault(); onEnterDashboard(); }} className="hover:text-black transition-colors">
-            Resources
-          </a>
-          <a href="#pricing" onClick={(e) => { e.preventDefault(); onEnterDashboard(); }} className="hover:text-black transition-colors">
-            Pricing
-          </a>
-        </nav>
-
-        {/* Right Actions */}
-        <div className="flex items-center space-x-4">
-          <button 
-            onClick={onEnterDashboard}
-            className="text-xs font-semibold text-slate-700 hover:text-black transition-colors px-2 py-1"
-          >
-            Sign In
-          </button>
-          <button 
-            onClick={onEnterDashboard}
-            className="bg-black hover:bg-zinc-800 text-white font-semibold text-xs py-2 px-5 rounded-full shadow-xs hover:shadow transition-all"
-          >
-            Get Started
-          </button>
-        </div>
-      </header>
+      {/* 1. SHARED MARKETING NAVBAR */}
+      <MarketingNavbar 
+        activePage="landing" 
+        onNavigate={onNavigate} 
+        onEnterDashboard={onEnterDashboard} 
+      />
 
       {/* 2. HERO HEADLINE & ACTIONS */}
       <main className="flex-1 w-full max-w-[1360px] mx-auto px-4 sm:px-6 pt-4 pb-14 flex flex-col items-center text-center relative z-10">
@@ -126,7 +76,7 @@ export function LandingPage({ onEnterDashboard, onOpenHowItWorks }) {
         <div className="flex items-center justify-center space-x-3.5 mt-6 z-20">
           <button 
             onClick={onEnterDashboard}
-            className="bg-black hover:bg-zinc-800 text-white text-xs font-semibold py-2.5 px-6 rounded-full flex items-center space-x-2 shadow-sm hover:shadow transition-all"
+            className="bg-black hover:bg-zinc-800 text-white text-xs font-semibold py-2.5 px-6 rounded-full flex items-center space-x-2 shadow-sm hover:shadow transition-all cursor-pointer"
           >
             <span>Start Reconciliation</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -134,13 +84,13 @@ export function LandingPage({ onEnterDashboard, onOpenHowItWorks }) {
 
           <button 
             type="button"
-            onClick={onOpenHowItWorks}
-            className="bg-white hover:bg-slate-50 text-black border border-slate-300 text-xs font-semibold py-2.5 px-5 rounded-full flex items-center space-x-2 shadow-2xs transition-all cursor-pointer"
+            onClick={() => setIsVideoOpen(true)}
+            className="bg-white hover:bg-slate-50 text-black border border-slate-300 text-xs font-semibold py-2.5 px-5 rounded-full flex items-center space-x-2 shadow-2xs transition-all cursor-pointer group"
           >
-            <div className="w-4 h-4 rounded-full border border-black flex items-center justify-center">
-              <Play className="w-2 h-2 fill-current ml-0.5" />
+            <div className="w-4 h-4 rounded-full border border-black group-hover:border-rose-600 group-hover:bg-rose-50 flex items-center justify-center transition-colors">
+              <Play className="w-2 h-2 fill-current ml-0.5 text-black group-hover:text-rose-600 transition-colors" />
             </div>
-            <span>See How It Works</span>
+            <span>Watch Demo</span>
           </button>
         </div>
 
@@ -149,7 +99,9 @@ export function LandingPage({ onEnterDashboard, onOpenHowItWorks }) {
           
           {/* ANCHOR: Proportional Central Product Device (w-[900px], h-[560px] for natural 1.6:1 ratio) */}
           <div 
-            className="relative w-full max-w-[860px] xl:w-[900px] shrink-0 bg-[#141717] rounded-[28px] p-3 sm:p-3.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-slate-700/60 text-left z-10 select-none cursor-default"
+            onClick={() => setIsVideoOpen(true)}
+            className="relative w-full max-w-[860px] xl:w-[900px] shrink-0 bg-[#141717] rounded-[28px] p-3 sm:p-3.5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-slate-700/60 hover:border-rose-500/50 text-left z-10 select-none cursor-pointer group/device transition-all"
+            title="Click to watch product walkthrough video"
           >
             {/* Top Device Camera/Dot */}
             <div className="w-2 h-2 rounded-full bg-zinc-800 mx-auto -mt-0.5 mb-2 opacity-60" />
@@ -438,6 +390,16 @@ export function LandingPage({ onEnterDashboard, onOpenHowItWorks }) {
               {/* Bottom Soft Fade Overlay */}
               <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-white/95 via-white/40 to-transparent pointer-events-none rounded-b-[20px] z-10" />
 
+              {/* Floating "Watch Video Walkthrough" Pill on device (Light Theme) */}
+              <div className="absolute bottom-4 right-4 z-20 pointer-events-auto">
+                <div className="flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/90 text-slate-800 text-[11px] font-semibold shadow-md group-hover/device:border-rose-300 group-hover/device:shadow-lg group-hover/device:scale-105 transition-all">
+                  <div className="w-4 h-4 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center transition-colors">
+                    <Play className="w-2 h-2 fill-current ml-0.5 text-rose-600 transition-colors" />
+                  </div>
+                  <span>Watch Walkthrough (2m)</span>
+                </div>
+              </div>
+
             </div>
 
             {/* ========================================================= */}
@@ -522,10 +484,20 @@ export function LandingPage({ onEnterDashboard, onOpenHowItWorks }) {
 
       </main>
 
-      {/* 5. Minimal Footer */}
-      <footer className="py-6 border-t border-slate-200 text-center text-xs text-slate-400 font-sans">
-        Ledger Forge Autonomous Bank Reconciliation Platform • “Knows when to stop and ask.”
-      </footer>
+      {/* 5. Shared Marketing Footer */}
+      <MarketingFooter 
+        onNavigate={onNavigate} 
+        onEnterDashboard={onEnterDashboard} 
+      />
+
+      {/* Product Walkthrough Video Modal */}
+      <VideoModal
+        isOpen={isVideoOpen}
+        onClose={() => setIsVideoOpen(false)}
+        videoId="G-fjDaS-v9s"
+        title="LedgerForge | Autonomous Bank Reconciliation Engine Walkthrough"
+        onEnterDashboard={onEnterDashboard}
+      />
 
     </div>
   );

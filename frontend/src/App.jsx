@@ -21,7 +21,10 @@ import { Footer } from './components/Footer';
 import { ReconciliationReportModal } from './components/ReconciliationReportModal';
 import { ReconciliationPolicyView } from './components/ReconciliationPolicyView';
 import { HowItWorksPage } from './components/HowItWorksPage';
-import DemoComponent from './components/ui/demo';
+import { ProductsPage } from './components/ProductsPage';
+import { SecurityPage } from './components/SecurityPage';
+import { ResourcesPage } from './components/ResourcesPage';
+import { PricingPage } from './components/PricingPage';
 
 import { 
   getAgentVersions, 
@@ -35,8 +38,45 @@ import {
 } from './services/api';
 
 export default function App() {
-  // Navigation View state: 'landing' or 'dashboard'
+  // Navigation View state: 'landing' | 'products' | 'how-it-works' | 'security' | 'resources' | 'pricing' | 'dashboard'
   const [currentView, setCurrentView] = useState('landing');
+  const [productSection, setProductSection] = useState('all');
+
+  // Synchronize hash changes for browser back/forward buttons
+  useEffect(() => {
+    const handleHashSync = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['products', 'how-it-works', 'security', 'resources', 'pricing'].includes(hash)) {
+        setCurrentView(hash);
+      } else if (!hash && currentView !== 'dashboard') {
+        setCurrentView('landing');
+      }
+    };
+    window.addEventListener('hashchange', handleHashSync);
+    // Initial mount check
+    if (window.location.hash) {
+      const initialHash = window.location.hash.replace('#', '');
+      if (['products', 'how-it-works', 'security', 'resources', 'pricing'].includes(initialHash)) {
+        setCurrentView(initialHash);
+      }
+    }
+    return () => window.removeEventListener('hashchange', handleHashSync);
+  }, []);
+
+  const handleNavigate = (viewName, sectionId = null) => {
+    if (sectionId) {
+      setProductSection(sectionId);
+    }
+    setCurrentView(viewName);
+    if (viewName === 'landing') {
+      if (window.location.hash) {
+        history.pushState(null, '', window.location.pathname);
+      }
+    } else if (['products', 'how-it-works', 'security', 'resources', 'pricing'].includes(viewName)) {
+      window.location.hash = viewName;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   
   // Dashboard internal tab
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -177,10 +217,44 @@ export default function App() {
     avg_cost_usd: 0.00004
   };
 
-  // IF COMPONENT DEMO VIEW IS ACTIVE
-  if (currentView === 'demo') {
+  // IF PRODUCTS VIEW IS ACTIVE
+  if (currentView === 'products') {
     return (
-      <DemoComponent onBack={() => setCurrentView('landing')} />
+      <ProductsPage
+        onNavigate={handleNavigate}
+        onEnterDashboard={() => setCurrentView('dashboard')}
+        initialSection={productSection}
+      />
+    );
+  }
+
+  // IF SECURITY VIEW IS ACTIVE
+  if (currentView === 'security') {
+    return (
+      <SecurityPage
+        onNavigate={handleNavigate}
+        onEnterDashboard={() => setCurrentView('dashboard')}
+      />
+    );
+  }
+
+  // IF RESOURCES VIEW IS ACTIVE
+  if (currentView === 'resources') {
+    return (
+      <ResourcesPage
+        onNavigate={handleNavigate}
+        onEnterDashboard={() => setCurrentView('dashboard')}
+      />
+    );
+  }
+
+  // IF PRICING VIEW IS ACTIVE
+  if (currentView === 'pricing') {
+    return (
+      <PricingPage
+        onNavigate={handleNavigate}
+        onEnterDashboard={() => setCurrentView('dashboard')}
+      />
     );
   }
 
@@ -188,8 +262,9 @@ export default function App() {
   if (currentView === 'how-it-works') {
     return (
       <HowItWorksPage
-        onBack={() => setCurrentView('landing')}
+        onBack={() => handleNavigate('landing')}
         onEnterDashboard={() => setCurrentView('dashboard')}
+        onNavigate={handleNavigate}
       />
     );
   }
@@ -199,7 +274,8 @@ export default function App() {
     return (
       <LandingPage
         onEnterDashboard={() => setCurrentView('dashboard')}
-        onOpenHowItWorks={() => setCurrentView('how-it-works')}
+        onOpenHowItWorks={() => handleNavigate('how-it-works')}
+        onNavigate={handleNavigate}
       />
     );
   }
@@ -407,8 +483,13 @@ export default function App() {
                 Comprehensive accounting reconciliation pack generated in accordance with GAAP & IFRS audit standards.
               </p>
               <button 
-                onClick={() => alert('Downloading Q1 Bank Reconciliation Executive Pack (PDF)...')}
-                className="btn-primary"
+                onClick={() => {
+                  if (latestReportData || batchData) {
+                    setLatestReportData(latestReportData || batchData);
+                    setShowReconciliationReport(true);
+                  }
+                }}
+                className="btn-primary cursor-pointer"
               >
                 Download Q1 Audit Summary (PDF)
               </button>

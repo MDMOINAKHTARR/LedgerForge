@@ -5,6 +5,9 @@ import {
   CheckCircle2, ShieldAlert, Sparkles, ExternalLink, Clock, FileText, RefreshCw
 } from 'lucide-react';
 import { getNotifications } from '../services/api';
+import Banner from '@/components/ui/astryx-banner';
+import { Theme } from '@astryxdesign/core/theme';
+import { neutralTheme } from '@astryxdesign/theme-neutral/built';
 
 export function TopHeader({ 
   searchTerm, 
@@ -19,6 +22,37 @@ export function TopHeader({
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef(null);
+
+  const DEFAULT_ALERTS = [
+    {
+      id: 'astryx-alert-1',
+      title: 'Deployment complete',
+      message: 'Version 3.2.0 is now live in production.',
+      time: 'Just now',
+      type: 'success',
+      unread: true,
+      actionLabel: 'View Status',
+      targetTab: 'dashboard'
+    },
+    {
+      id: 'astryx-alert-2',
+      title: 'Scheduled maintenance tonight',
+      message: 'The system will be briefly unavailable from 2:00–3:00 AM.',
+      time: 'Tonight',
+      type: 'alert',
+      unread: true
+    },
+    {
+      id: 'astryx-alert-3',
+      title: 'New feature available',
+      message: 'Try the new dashboard layout in Settings.',
+      time: '1h ago',
+      type: 'info',
+      unread: false,
+      actionLabel: 'Try Layout',
+      targetTab: 'dashboard'
+    }
+  ];
 
   // Fetch real-time dynamic notifications from live backend
   const fetchLiveNotifications = async () => {
@@ -38,13 +72,14 @@ export function TopHeader({
             unread: true,
             actionLabel: 'Review Exceptions',
             targetTab: 'exceptions'
-          }
+          },
+          ...DEFAULT_ALERTS
         ]);
       } else {
-        setNotifications([]);
+        setNotifications(DEFAULT_ALERTS);
       }
     } catch (err) {
-      console.warn('Could not fetch dynamic notifications:', err);
+      console.warn('Could not fetch dynamic notifications, using defaults:', err);
       if (pendingExceptionsCount > 0) {
         setNotifications([
           {
@@ -56,10 +91,11 @@ export function TopHeader({
             unread: true,
             actionLabel: 'Review Exceptions',
             targetTab: 'exceptions'
-          }
+          },
+          ...DEFAULT_ALERTS
         ]);
       } else {
-        setNotifications([]);
+        setNotifications(DEFAULT_ALERTS);
       }
     } finally {
       setIsLoading(false);
@@ -128,9 +164,28 @@ export function TopHeader({
     }
   };
 
+  const resolveBannerStatus = (notif) => {
+    if (notif.status && ['success', 'warning', 'info', 'error'].includes(notif.status)) {
+      return notif.status;
+    }
+    const type = String(notif.type || '').toLowerCase();
+    if (type === 'alert' || type === 'warning' || type === 'error') return 'warning';
+    if (type === 'success') return 'success';
+    if (type === 'info') return 'info';
+    
+    const text = `${notif.title || ''} ${notif.message || ''}`.toLowerCase();
+    if (text.includes('exception') || text.includes('warning') || text.includes('variance') || text.includes('maintenance')) {
+      return 'warning';
+    }
+    if (text.includes('complete') || text.includes('reconciled') || text.includes('success')) {
+      return 'success';
+    }
+    return 'info';
+  };
+
   const filteredNotifications = notifications.filter(n => {
     if (filter === 'unread') return n.unread;
-    if (filter === 'alerts') return n.type === 'alert';
+    if (filter === 'alerts') return resolveBannerStatus(n) === 'warning' || n.type === 'alert';
     return true;
   });
 
@@ -195,7 +250,7 @@ export function TopHeader({
 
           {/* Dropdown Popover */}
           {isOpen && (
-            <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200/90 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute right-0 mt-3 w-88 sm:w-[440px] max-w-[92vw] bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
               
               {/* Header */}
               <div className="px-4 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
@@ -276,10 +331,10 @@ export function TopHeader({
                 </button>
               </div>
 
-              {/* Notification List Body */}
-              <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+              {/* Notification List Body with Astryx Alert Design */}
+              <div className="astryx-notif-menu max-h-[420px] overflow-y-auto p-3.5 bg-slate-50/50">
                 {filteredNotifications.length === 0 ? (
-                  <div className="p-8 text-center">
+                  <div className="p-8 text-center bg-white rounded-xl border border-slate-100">
                     <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-2.5 border border-emerald-100">
                       <CheckCircle2 className="w-5 h-5" />
                     </div>
@@ -287,83 +342,44 @@ export function TopHeader({
                     <p className="text-[11px] text-slate-400 mt-0.5">You're all caught up with your reconciliation alerts.</p>
                   </div>
                 ) : (
-                  filteredNotifications.map((notif) => (
-                    <div
-                      key={notif.id}
-                      className={`p-3.5 transition-colors group relative ${
-                        notif.unread ? 'bg-indigo-50/30 hover:bg-indigo-50/50' : 'bg-white hover:bg-slate-50/80'
-                      }`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        {/* Icon by Type */}
-                        <div className="mt-0.5 shrink-0">
-                          {notif.type === 'alert' && (
-                            <div className="w-7 h-7 rounded-lg bg-rose-50 border border-rose-200/80 text-rose-600 flex items-center justify-center">
-                              <AlertTriangle className="w-3.5 h-3.5" />
-                            </div>
-                          )}
-                          {notif.type === 'success' && (
-                            <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200/80 text-emerald-600 flex items-center justify-center">
-                              <Sparkles className="w-3.5 h-3.5" />
-                            </div>
-                          )}
-                          {notif.type === 'info' && (
-                            <div className="w-7 h-7 rounded-lg bg-sky-50 border border-sky-200/80 text-sky-600 flex items-center justify-center">
-                              <ShieldAlert className="w-3.5 h-3.5" />
-                            </div>
-                          )}
-                          {notif.type === 'report' && (
-                            <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-600 flex items-center justify-center">
-                              <FileText className="w-3.5 h-3.5" />
-                            </div>
-                          )}
-                        </div>
+                  <Theme theme={neutralTheme}>
+                    <div className="space-y-3">
+                      {filteredNotifications.map((notif) => {
+                        const bannerStatus = resolveBannerStatus(notif);
 
-                        {/* Text Details */}
-                        <div className="flex-1 min-w-0 pr-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className={`text-xs font-semibold leading-tight truncate ${
-                              notif.unread ? 'text-slate-900 font-bold' : 'text-slate-700'
-                            }`}>
-                              {notif.title}
-                            </h4>
-                            <span className="text-[10px] text-slate-400 font-mono ml-2 shrink-0">
-                              {notif.time}
-                            </span>
+                        return (
+                          <div key={notif.id} className="relative group transition-all">
+                            <Banner
+                              status={bannerStatus}
+                              title={<span className="font-bold text-slate-950 text-[13px] tracking-tight">{notif.title}</span>}
+                              description={
+                                <div className="space-y-1.5 mt-0.5">
+                                  <p className="text-xs leading-relaxed font-semibold text-slate-950">{notif.message}</p>
+                                  {notif.time && (
+                                    <div className="flex items-center gap-1 text-[10px] text-slate-700 font-mono font-medium">
+                                      <Clock className="w-2.5 h-2.5 text-slate-700" />
+                                      <span>{notif.time}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              }
+                              isDismissable
+                              onDismiss={() => handleDismiss(notif.id)}
+                              endContent={notif.actionLabel ? (
+                                <button
+                                  onClick={() => handleActionClick(notif)}
+                                  className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white/95 hover:bg-white text-slate-800 shadow-2xs border border-slate-200/80 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                                >
+                                  <span>{notif.actionLabel}</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </button>
+                              ) : undefined}
+                            />
                           </div>
-
-                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                            {notif.message}
-                          </p>
-
-                          {/* Quick Action Button */}
-                          {notif.actionLabel && (
-                            <button
-                              onClick={() => handleActionClick(notif)}
-                              className="mt-2.5 inline-flex items-center space-x-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100/70 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
-                            >
-                              <span>{notif.actionLabel}</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Actions (mark read / dismiss) */}
-                        <div className="flex flex-col items-center space-y-1 shrink-0 pt-0.5">
-                          <button
-                            onClick={(e) => handleDismiss(notif.id, e)}
-                            className="p-1 rounded text-slate-300 hover:text-slate-500 hover:bg-slate-200/60 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                            title="Dismiss notification"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                          {notif.unread && (
-                            <span className="w-2 h-2 rounded-full bg-indigo-500" title="Unread" />
-                          )}
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
-                  ))
+                  </Theme>
                 )}
               </div>
 

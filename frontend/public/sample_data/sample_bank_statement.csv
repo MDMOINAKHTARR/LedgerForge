@@ -1,0 +1,7 @@
+Date,Amount,Currency,Description,Reference_ID
+2026-03-01,1500.00,USD,Stripe Payout Ref INV-9001,INV-9001
+2026-03-05,4200.50,USD,Acme Corp Vendor Payment,INV-9002
+2026-03-03,2480.00,USD,GlobalTech Wire Net Deposit,INV-9003
+2026-03-04,1085.00,USD,EuroClient Consulting Fee,INV-9004
+2026-03-02,890.00,USD,AWS EMEA Cloud Hosting,INV-9005
+2026-03-06,350.00,USD,Unknown Direct Deposit XYZ,
