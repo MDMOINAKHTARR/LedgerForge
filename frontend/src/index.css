@@ -75,8 +75,17 @@
 }
 
 @keyframes pulse-subtle {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(0.96); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(0.96);
+  }
 }
 
 .animate-pulse-subtle {
@@ -97,10 +106,12 @@
   justify-content: center;
   gap: 0.5rem;
 }
+
 .btn-primary:hover:not(:disabled) {
   background-color: #27272A;
   transform: translateY(-1px);
 }
+
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -120,6 +131,7 @@
   justify-content: center;
   gap: 0.5rem;
 }
+
 .btn-secondary:hover:not(:disabled) {
   background-color: #F4F4F5;
   border-color: #A1A1AA;
@@ -129,8 +141,8 @@
 .fintech-card {
   background-color: #FFFFFF;
   border: 1px solid rgba(226, 232, 240, 0.85);
-  box-shadow: 
-    0 1px 3px 0 rgba(15, 23, 42, 0.03), 
+  box-shadow:
+    0 1px 3px 0 rgba(15, 23, 42, 0.03),
     0 1px 2px -1px rgba(15, 23, 42, 0.02),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
   border-radius: 16px;
@@ -139,8 +151,8 @@
 
 .fintech-card-hover:hover {
   border-color: rgba(203, 213, 225, 0.95);
-  box-shadow: 
-    0 4px 16px -2px rgba(15, 23, 42, 0.06), 
+  box-shadow:
+    0 4px 16px -2px rgba(15, 23, 42, 0.06),
     0 2px 6px -1px rgba(15, 23, 42, 0.03),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
   transform: translateY(-1px);
@@ -164,8 +176,8 @@
 .fintech-card-glow {
   background-color: #FFFFFF;
   border: 1px solid rgba(203, 213, 225, 0.9);
-  box-shadow: 
-    0 1px 3px 0 rgba(15, 23, 42, 0.04), 
+  box-shadow:
+    0 1px 3px 0 rgba(15, 23, 42, 0.04),
     0 8px 24px -4px rgba(15, 23, 42, 0.05),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
   border-radius: 20px;
@@ -175,7 +187,7 @@
 .fintech-card-dark {
   background: linear-gradient(180deg, #131722 0%, #0A0D14 100%);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 
+  box-shadow:
     0 20px 40px -15px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
   border-radius: 24px;
@@ -221,15 +233,19 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   from {
     color: inherit;
   }
+
   to {
     color: transparent;
   }
 }
 
 @keyframes x13kz0yu-B {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: .5;
   }
@@ -239,6 +255,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -248,6 +265,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   0% {
     opacity: .25;
   }
+
   100% {
     opacity: 1;
   }
@@ -257,9 +275,11 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   0% {
     opacity: 1;
   }
+
   50% {
     opacity: .5;
   }
+
   100% {
     opacity: 1;
   }
@@ -270,6 +290,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
     opacity: 0;
     transform: scale(.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -279,11 +300,12 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
 @keyframes x11lauxq-B {
   from {
     opacity: 0;
-    transform: translate(var(--dialog-dir-x,0px),var(--dialog-dir-y,16px)) scale(.95);
+    transform: translate(var(--dialog-dir-x, 0px), var(--dialog-dir-y, 16px)) scale(.95);
   }
+
   to {
     opacity: 1;
-    transform: translate(0,0) scale(1);
+    transform: translate(0, 0) scale(1);
   }
 }
 
@@ -292,6 +314,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
     opacity: 0;
     transform: translateX(var(--spacing-2)) scale(.95);
   }
+
   to {
     opacity: 1;
     transform: translateX(0) scale(1);
@@ -303,6 +326,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
     opacity: 0;
     transform: translateX(calc(-1 * var(--spacing-2))) scale(.95);
   }
+
   to {
     opacity: 1;
     transform: translateX(0) scale(1);
@@ -314,6 +338,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
     opacity: 0;
     transform: translateY(var(--spacing-2)) scale(.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -325,6 +350,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
     opacity: 0;
     transform: translateY(calc(-1 * var(--spacing-2))) scale(.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -336,6 +362,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
     opacity: 0;
     transform: translateY(var(--spacing-2));
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -347,6 +374,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
     opacity: 0;
     transform: translateY(calc(-1 * var(--spacing-2)));
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -357,6 +385,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -366,6 +395,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(250%);
   }
@@ -375,6 +405,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
 .astryx-notif-menu {
   color: #090d16;
 }
+
 .astryx-notif-menu [data-astryx-theme] {
   --color-text-primary: #020617 !important;
   --color-text-secondary: #0f172a !important;
@@ -387,6 +418,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   --color-text-gray: #0f172a !important;
   color: #020617 !important;
 }
+
 .astryx-notif-menu [data-astryx-component="banner"],
 .astryx-notif-menu [data-astryx-component="banner"] * {
   --color-text-blue: #0f274a !important;
@@ -396,6 +428,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   --color-text-red: #5c0a0a !important;
   --color-text-gray: #0f172a !important;
 }
+
 .astryx-notif-menu [class*="banner"] h1,
 .astryx-notif-menu [class*="banner"] h2,
 .astryx-notif-menu [class*="banner"] h3,
@@ -405,6 +438,7 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
   color: #020617 !important;
   font-weight: 700 !important;
 }
+
 .astryx-notif-menu [class*="banner"] p,
 .astryx-notif-menu [class*="banner-description"] {
   color: #0f172a !important;
@@ -415,8 +449,3 @@ input[type="range"].fintech-slider::-webkit-slider-thumb:hover {
 .custom-cursor-none * {
   cursor: none !important;
 }
-
-
-
-
-
